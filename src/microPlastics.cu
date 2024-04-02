@@ -240,9 +240,9 @@ void setInitailConditions()
 			if(j == 0)
 			{
 				startId = k;
-				BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
+				BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*10.0 - 5.0;
+				BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*10.0 - 5.0;
+				BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*10.0 - 5.0;
 				PolymerConnectionA[k] = -1;
 				if(j+1 < PolymerChainLength[i]) PolymerConnectionB[k] = k+1;
 				else PolymerConnectionB[k] = -1;
@@ -250,9 +250,9 @@ void setInitailConditions()
 			}
 			else
 			{
-				BodyPosition[k].x = BodyPosition[startId].x + j*(PolymersConnectionLength+0.005);
-				BodyPosition[k].y = BodyPosition[startId].y;
-				BodyPosition[k].z = BodyPosition[startId].z;
+				BodyPosition[k].x = BodyPosition[startId].x + j*(((float)rand()/(float)RAND_MAX))*PolymersConnectionLength + 1;
+				BodyPosition[k].y = BodyPosition[startId].y + j*(((float)rand()/(float)RAND_MAX))*PolymersConnectionLength + 1;
+				BodyPosition[k].z = BodyPosition[startId].z + j*(((float)rand()/(float)RAND_MAX))*PolymersConnectionLength + 1;
 				PolymerConnectionA[k] = k-1;
 				if(j+1 < PolymerChainLength[i]) PolymerConnectionB[k] = k+1;
 				else PolymerConnectionB[k] = -1;
@@ -269,9 +269,9 @@ void setInitailConditions()
 	// Setting intial pos of micro plastics
 	for(int i = NumberOfPolymers; i < NumberOfBodies; i++)
 	{
-		BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-		BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-		BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
+		BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*10.0 - 5.0;
+		BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*10.0 - 5.0;
+		BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*10.0 - 5.0;
 		k++;
 	}
 
@@ -448,7 +448,7 @@ __device__ float4 getPolymerMicroPlasticForce(float4 p0, float4 p1)
     else if(r < 1.0*(p0.w + p1.w))
     {
     	// Polymer microPlastic actraction
-    	force  += 0.1;
+    	force  += 100000;
     }
     
     f.x = force*dx/r;
@@ -672,7 +672,7 @@ int main(int argc, char** argv)
 	//Direction here your eye is located location
 	EyeX = 0.0;
 	EyeY = 0.0;
-	EyeZ = 20.0;
+	EyeZ = 10.0;
 
 	//Where you are looking
 	CenterX = 0.0;

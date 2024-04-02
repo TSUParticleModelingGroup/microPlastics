@@ -40,8 +40,16 @@ void KeyPressed(unsigned char key, int x, int y)
 	}
 	if(key == 'p')
 	{
-		if(Pause == 1) Pause = 0;
-		else Pause = 1;
+		if(Pause == 1) 
+		{
+			printf("\nSimulation paused");
+			Pause = 0;
+		}
+		else 
+		{
+			printf("\nSimulation running");
+			Pause = 1;
+		}
 	}
 	if(key == 'm')
 	{
@@ -70,19 +78,18 @@ void mymouse(int button, int state, int x, int y)
 	{
 		if(button == GLUT_LEFT_BUTTON)
 		{
-			printf("\n Left mouse button down");
-			printf("\n mouse x = %d mouse y = %d\n", x, y);
+			//printf("\n Left mouse button down");
+			//printf("\n mouse x = %d mouse y = %d\n", x, y);
 			//myX = (2.0*x/XWindowSize - 1.0)*RadiusOfCavity;
 			//myY = (-2.0*y/YWindowSize + 1.0)*RadiusOfCavity;
 		}
 		else
 		{
-			printf("\nRight mouse button down");
-			printf("\nmouse x = %d mouse y = %d\n", x, y);
+			//printf("\nRight mouse button down");
+			//printf("\nmouse x = %d mouse y = %d\n", x, y);
 			//myX = (2.0*x/XWindowSize - 1.0)*RadiusOfAtria;
 			//myY = (-2.0*y/YWindowSize + 1.0)*RadiusOfAtria;
 		}
 		//printf("\nSNx = %f SNy = %f SNz = %f\n", NodePosition[0].x, NodePosition[0].y, NodePosition[0].z);
 	}
 }
-

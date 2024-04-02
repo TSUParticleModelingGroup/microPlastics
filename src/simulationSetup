@@ -12,7 +12,7 @@ DiameterOfMicroPlasticMin = 0.01;
 
 NumberOfPolymerChains = 20;
 
-PolymersChainLengthMax = 555;
+PolymersChainLengthMax = 100;
 
 PolymersChainLengthMin = 2;
 
@@ -20,9 +20,9 @@ PolymersConnectionLength = 0.000001;
 
 DensityOfPolymer = 1.0;
 
-DiameterOfPolymer = 0.5;
+DiameterOfPolymer = 0.05;
 
-Drag = 11.2;
+Drag = 1.12;
 
 TotalRunTime = 100000.0;
 
