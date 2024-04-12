@@ -1,3 +1,3 @@
+cd ./SourceFiles
 nvcc microPlastics.cu -o microPlastics -lglut -lm -lGLU -lGL
-
-./microPlastics
+mv microPlastics ../ExecutableFiles
