@@ -219,7 +219,7 @@ void setInitailConditions()
 		BodyForce[i].w = 1.0; //(4.0/3.0)*PI*(BodyPosition[i].w/2.0)*(BodyPosition[i].w/2.0)*(BodyPosition[i].w/2.0);
 	}
 	
-	// Setting velocity, diameter and mass of polymers
+	// Setting velocity, diameter and mass of microplastics
 	for(int i = NumberOfPolymers; i < NumberOfBodies; i++)
 	{
 		BodyVelocity[i].x = 0.0;
