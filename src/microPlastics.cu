@@ -16,8 +16,15 @@ using namespace std;
 
 FILE* ffmpeg;
 
+#define BOLD_ON  "\e[1m"
+#define BOLD_OFF   "\e[m"
+
 #define PI 3.141592654
 #define BLOCK 256
+
+FILE* MovieFile;
+int* Buffer;
+int MovieFlag; // 0 movie off, 1 movie on
 
 // Globals to be read in from parameter file.
 int NumberOfMicroPlastics;
@@ -38,9 +45,11 @@ float Drag;
 float TotalRunTime;
 float Dt;
 int DrawRate;
+int PrintRate;
 
 // Other Globals
 int Pause;
+int ViewFlag; // 0 orthoganal, 1 fulstum
 int NumberOfBodies;
 float4 *BodyPosition, *BodyVelocity, *BodyForce;
 float4 *BodyPositionGPU, *BodyVelocityGPU, *BodyForceGPU;
@@ -48,15 +57,17 @@ int *PolymerChainLength;
 int *PolymerConnectionA, *PolymerConnectionB;
 int *PolymerConnectionAGPU, *PolymerConnectionBGPU;
 dim3 Blocks, Grids;
-int DrawTimer;
+int DrawTimer, PrintTimer;
 float RunTime;
-int* Buffer;
-int MovieOn;
+float4 CenterOfSimulation;
+float4 AngleOfSimulation;
+float BeakerRadius = 4900.0;
+float BeakerHeight = 118000.0;
 
 // Window globals
 static int Window;
 int XWindowSize;
-int YWindowSize; 
+int YWindowSize;
 double Near;
 double Far;
 double EyeX;
@@ -77,6 +88,7 @@ void setInitailConditions();
 void drawPicture();
 void nBody();
 void errorCheck(const char*);
+void terminalPrint();
 void setup();
 
 #include "./callBackFunctions.h"
@@ -131,6 +143,9 @@ void readSimulationParameters()
 		
 		getline(data,name,'=');
 		data >> DrawRate;
+		
+		getline(data,name,'=');
+		data >> PrintRate;
 	}
 	else
 	{
@@ -153,8 +168,7 @@ void setNumberOfBodies()
 	for(int i = 0; i < NumberOfPolymerChains; i++)
 	{
 		PolymerChainLength[i] = ((float)rand()/(float)RAND_MAX)*(PolymersChainLengthMax - PolymersChainLengthMin) + PolymersChainLengthMin;
-		printf("\n PolymerChainLength[%d] = %d", i, PolymerChainLength[i]);
-			
+		//printf("\n PolymerChainLength[%d] = %d", i, PolymerChainLength[i]);	
 	}
 	
 	NumberOfPolymers = 0;
@@ -201,8 +215,6 @@ void allocateMemory()
 
 void setInitailConditions()
 {
-	//float dx, dy, dz, d, d2;
-	//int test;
 	int startId;
 	time_t t;
 	srand((unsigned) time(&t));
@@ -219,7 +231,7 @@ void setInitailConditions()
 		BodyForce[i].w = 1.0; //(4.0/3.0)*PI*(BodyPosition[i].w/2.0)*(BodyPosition[i].w/2.0)*(BodyPosition[i].w/2.0);
 	}
 	
-	// Setting velocity, diameter and mass of microplastics
+	// Setting velocity, diameter and mass of polymers
 	for(int i = NumberOfPolymers; i < NumberOfBodies; i++)
 	{
 		BodyVelocity[i].x = 0.0;
@@ -232,17 +244,57 @@ void setInitailConditions()
 	}
 	
 	// Setting intial pos of polymers
-	int k = 0;	
+	int k = 0;
+	int test = 0;
 	for(int i = 0; i < NumberOfPolymerChains; i++)
 	{
+		test = 0;
 		for(int j = 0; j < PolymerChainLength[i]; j++)
 		{
 			if(j == 0)
 			{
 				startId = k;
-				BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
+				float angle = 2.0*PI*(float)rand()/(float)RAND_MAX;
+				BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * cos(angle));
+				BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * sin(angle));
+
+				if(i > 0)
+				{
+					for(int l = 0; l < k-1; l++)
+					{
+						float dx = BodyPosition[k].x-BodyPosition[l].x;
+						float dy = BodyPosition[k].y-BodyPosition[l].y;
+						float d2  = dx*dx + dy*dy;
+						float d = sqrt(d2);
+						
+						if(d < 3*DiameterOfPolymer)
+						{
+							test = 1;
+							/*
+							printf("\n***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+							printf("***************************************\n");
+
+							printf("detected at i = %d, j = %d\n", i, j);
+							*/
+							i--;
+							break;
+						}
+					}
+				}
+				if(test == 1)
+				{
+					break;
+				}
+
+				BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerHeight - PolymersChainLengthMax*DiameterOfPolymer);
 				PolymerConnectionA[k] = -1;
 				if(j+1 < PolymerChainLength[i]) PolymerConnectionB[k] = k+1;
 				else PolymerConnectionB[k] = -1;
@@ -258,59 +310,61 @@ void setInitailConditions()
 				else PolymerConnectionB[k] = -1;
 				k++;
 			}
+			/*
+			//for debugging, print all polymer positions
+			printf("\n\nPolymer");
+			printf("\n i = %d", i);
+			printf("\n j = %d", j);
+			printf("\n k = %d", k);
+			printf("\npolymer chain length = %d", PolymerChainLength[i]);
+			printf("\n x = %f", BodyPosition[i].x);
+			printf("\n y = %f", BodyPosition[i].y);
+			printf("\n z = %f", BodyPosition[i].z);
+			*/
 		}
 	}
 	
-	for(int i = 0; i < NumberOfPolymers; i++)
+	/*for(int i = 0; i < NumberOfPolymers; i++)
 	{
 		printf("\n %d: A = %d B = %d", i, PolymerConnectionA[i], PolymerConnectionB[i]);
-	}
-	
+	}*/
+
 	// Setting intial pos of micro plastics
 	for(int i = NumberOfPolymers; i < NumberOfBodies; i++)
 	{
-		BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-		BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-		BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-		k++;
-	}
+		float angle = 2.0*PI*(float)rand()/(float)RAND_MAX;
+		BodyPosition[i].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * cos(angle));
+		BodyPosition[i].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * sin(angle));
+		BodyPosition[i].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerHeight - 10.0*DiameterOfMicroPlasticMax);
 
-/*		
-		test = 0;
-		while(test == 0)
+		//check for overlap with other bodies
+		for(int j = 0; j < i-1; j++)
 		{
-			// Get random number between -1 at 1.
-			BodyPosition[i].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-			BodyPosition[i].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-			BodyPosition[i].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-			BodyPosition[i].w = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; 	//MassOfBody;
-			test = 1;
+			float dx = BodyPosition[i].x-BodyPosition[j].x;
+			float dy = BodyPosition[i].y-BodyPosition[j].y;
+			float dz = BodyPosition[i].z-BodyPosition[j].z;
+			float d2  = dx*dx + dy*dy + dz*dz;
+			float d = sqrt(d2);
 			
-			for(int j = 0; j < i; j++)
+			if(d < 1.5 * DiameterOfMicroPlasticMax)
 			{
-				dx = BodyPosition[i].x-BodyPosition[j].x;
-				dy = BodyPosition[i].y-BodyPosition[j].y;
-				dz = BodyPosition[i].z-BodyPosition[j].z;
-				d2  = dx*dx + dy*dy + dz*dz;
-				d = sqrt(d2);
-				
-				//if(d < DiameterOfBody)
-				//{
-				//	test = 0;
-				//	break;
-				//}
-			}
-			
-			if(test == 1)
-			{
-				BodyVelocity[i].x = 0.0; //VelocityMax*((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyVelocity[i].y = 0.0; //VelocityMax*((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyVelocity[i].z = 0.0;  //VelocityMax*((float)rand()/(float)RAND_MAX)*2.0 - 1.0;
-				BodyVelocity[i].w = 0.0;
+				i--;
+				break;
 			}
 		}
+
+		/*for debugging
+		printf("\n\nMicroPlastics Start Here\n\n");
+		printf("\n\n i = %d", i);
+		printf("\n\n k = %d", k);
+		printf("\n\n x = %f", BodyPosition[i].x);
+		printf("\n\n y = %f", BodyPosition[i].y);
+		printf("\n\n z = %f", BodyPosition[i].z);
+		//just to be safe, do angle and radius again
+		printf("\n\n angle = %f", angle);
+		printf("\n\n radius = %f", BeakerRadius);
+		*/
 	}
-*/
 	printf("\n\n Initail conditions have been set.");
 	printf("\n");
 }
@@ -341,12 +395,13 @@ void drawPicture()
 	glutSwapBuffers();
 	
 	
-	if(MovieOn == 1)
+	if(MovieFlag == 1)
 	{
 		glReadPixels(5, 5, XWindowSize, YWindowSize, GL_RGBA, GL_UNSIGNED_BYTE, Buffer);
-		fwrite(Buffer, sizeof(int)*XWindowSize*YWindowSize, 1, ffmpeg);
+		fwrite(Buffer, sizeof(int)*XWindowSize*YWindowSize, 1, MovieFile);
 	}
 }
+
 
 /*
 void brownian_motion(float3 *force)
@@ -380,13 +435,25 @@ void brownian_motion(float3 *force)
 	}
 }
 */
+
+/******************************************************************************
+ This is the Brownian Motion function.
+ Place any comments and papers you used to get parameters for this function here.
+ The above commented out function is one I ased to get Brownian Motion in another project.
+ 
+*******************************************************************************/
 /*
 __device__ float4 brownian_motion(float4 p0, other stuff)
 {
 	get cuda rand working and use the code above to get you started.
 }
 */
-                                 
+
+/******************************************************************************
+ This is the Polymer to Polymer interaction function.
+ Place any comments and papers you used to get parameters for this function here.
+ 
+*******************************************************************************/                                 
 __device__ float4 getPolymerPolymerForce(float4 p0, float4 p1, int linkA, int linkB, int yourId, float length, int myId)
 {
     float4 f;
@@ -426,6 +493,11 @@ __device__ float4 getPolymerPolymerForce(float4 p0, float4 p1, int linkA, int li
     return(f);
 }
 
+/******************************************************************************
+ This is the Polymer to micro-plastic interaction function.
+ Place any comments and papers you used to get parameters for this function here.
+ 
+*******************************************************************************/
 __device__ float4 getPolymerMicroPlasticForce(float4 p0, float4 p1)
 {
     float4 f;
@@ -458,6 +530,12 @@ __device__ float4 getPolymerMicroPlasticForce(float4 p0, float4 p1)
     return(f);
 }
 
+/******************************************************************************
+ This is the micro-plasic to micro-plastic interaction function.
+ Place any comments and papers you used to get parameters for this function here.
+ Self-Assembled Plasmonic Nanoparticle Clusters: 
+ https://www.science.org/doi/10.1126/science.1187949#editor-abstract
+*******************************************************************************/
 __device__ float4 getMicroPlasticMicroPlasticForce(float4 p0, float4 p1)
 {
     float4 f;
@@ -594,7 +672,7 @@ void nBody()
 		getForces<<<Grids, Blocks>>>(BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, PolymerConnectionAGPU, PolymerConnectionBGPU, PolymersConnectionLength, NumberOfPolymers, NumberOfMicroPlastics);
 		moveBodies<<<Grids, Blocks>>>(BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, Drag, Dt, NumberOfBodies);
 		
-		//*******************************************
+		//*******************************************milliseconds
 		// Pull this out when you get the Brownian Motion stuff working
 		cudaMemcpy( BodyVelocity, BodyVelocityGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
 		
@@ -613,11 +691,19 @@ void nBody()
         	DrawTimer++;
 		if(DrawTimer == DrawRate) 
 		{
-		    cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
+			cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
 			drawPicture();
 			//printf("\n Time = %f", RunTime);
 			DrawTimer = 0;
 		}
+		
+		PrintTimer++;
+		if(PrintRate <= PrintTimer) 
+		{
+			terminalPrint();
+			PrintTimer = 0;
+		}
+		
 		RunTime += Dt; 
 		if(TotalRunTime < RunTime)
 		{
@@ -639,6 +725,80 @@ void errorCheck(const char *message)
 	}
 }
 
+void terminalPrint()
+{
+	//system("clear");
+	//printf("\033[0;34m"); // blue.
+	//printf("\033[0;36m"); // cyan
+	//printf("\033[0;33m"); // yellow
+	//printf("\033[0;31m"); // red
+	//printf("\033[0;32m"); // green
+	printf("\033[0m"); // back to white.
+	
+	printf("\n");
+	printf("\033[0;33m");
+	printf("\n **************************** Simulation Stats ****************************");
+	printf("\033[0m");
+	
+	printf("\n Total run time = %7.2f *time units*", RunTime);
+	
+	printf("\033[0;33m");
+	printf("\n **************************** Terminal Comands ****************************");
+	printf("\033[0m");
+	//printf("\n h: Help");
+	//printf("\n c: Recenter View");
+	printf("\n c: Screenshot");
+	//printf("\n k: Save Current Run");
+	printf("\n");
+	
+	printf("\n Toggles");
+	printf("\n r: Run/Pause            - ");
+	if(Pause == 0) 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Simulation Running" BOLD_OFF);
+	} 
+	else
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Simulation Paused" BOLD_OFF);
+	}
+	printf("\n v: Orthogonal/Frustum   - ");
+	if (ViewFlag == 0) 
+	{
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Orthogonal" BOLD_OFF); 
+	}
+	else 
+	{
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Frustrum" BOLD_OFF);
+	}
+	printf("\n m: Video On/Off         - ");
+	if (MovieFlag == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Video Recording Off" BOLD_OFF); 
+	}
+	else 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Video Recording On" BOLD_OFF);
+	}
+	
+	printf("\n");
+	printf("\n Adjust views");
+	printf("\n k/l: Rotate CW/CCW");
+	printf("\n a/d: Translate Left/Right");
+	printf("\n s/w: Translate Down/Up");
+	printf("\n z/Z: Translate Out/In");
+	printf("\n f:   Recenter");
+	printf("\n");
+	printf("\n ********************************************************************");
+	printf("\033[0m");
+	printf("\n");
+}
+
 void setup()
 {	
 	readSimulationParameters();
@@ -652,9 +812,27 @@ void setup()
 	cudaMemcpy( PolymerConnectionAGPU, PolymerConnectionA, NumberOfPolymers*sizeof(int), cudaMemcpyHostToDevice );
 	cudaMemcpy( PolymerConnectionBGPU, PolymerConnectionB, NumberOfPolymers*sizeof(int), cudaMemcpyHostToDevice );
 	
+	cudaSetDevice(0); // Select GPU device 0
+    	cudaDeviceSynchronize();
+	
 	DrawTimer = 0;
+	PrintTimer = 0;
 	RunTime = 0.0;
 	Pause = 1;
+	MovieFlag = 0;
+	ViewFlag = 1;
+	
+	CenterOfSimulation.x = 0.0;
+	CenterOfSimulation.y = 0.0;
+	CenterOfSimulation.z = 0.0;
+	CenterOfSimulation.w = 0.0;
+	
+	AngleOfSimulation.x = 0.0;
+	AngleOfSimulation.y = 1.0;
+	AngleOfSimulation.z = 0.0;
+	AngleOfSimulation.w = 0.0;
+	
+	terminalPrint();
 }
 
 int main(int argc, char** argv)
@@ -672,7 +850,7 @@ int main(int argc, char** argv)
 	//Direction here your eye is located location
 	EyeX = 0.0;
 	EyeY = 0.0;
-	EyeZ = 20.0;
+	EyeZ = 2.0;
 
 	//Where you are looking
 	CenterX = 0.0;
