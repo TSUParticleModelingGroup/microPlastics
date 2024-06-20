@@ -1,18 +1,3 @@
-void Display(void);
-void idle();
-void reshape(int, int);
-void orthoganialView();
-void fulstrumView();
-void KeyPressed(unsigned char, int, int);
-void mymouse(int, int, int, int);
-string getTimeStamp();
-void movieOn();
-void movieOff();
-void screenShot();
-void helpMenu();
-
-
-
 void Display()
 {
 	drawPicture();
@@ -48,95 +33,7 @@ void fulstrumView()
 	drawPicture();
 }
 
-void KeyPressed(unsigned char key, int x, int y)//movekeyPressed functions over as well
-{	
-	if(key == 'h')  // Help menu
-	{
-		helpMenu();
-	}
-	if(key == 'q')
-	{
-		pclose(ffmpeg);
-		glutDestroyWindow(Window);
-		printf("\nw Good Bye\n");
-		exit(0);
-	}
-	if(key == 'r')  // Run toggle
-	{
-		if(Pause == 0) Pause = 1;
-		else Pause = 0;
-		terminalPrint();
-	}
-	if(key == 'v') // Orthoganal/Frustum view toggle
-	{
-		if(ViewFlag == 0) 
-		{
-			ViewFlag = 1;
-			fulstrumView();
-		}
-		else 
-		{
-			ViewFlag = 0;
-			orthoganialView();
-		}
-		drawPicture();
-		terminalPrint();
-	}
-	if(key == 'S')  // Screenshot
-	{	
-		screenShot();
-		terminalPrint();
-	}
-	if(key == 'm')  // Movie on
-	{
-		if(MovieFlag == 0) 
-		{
-			MovieFlag = 1;
-			movieOn();
-		}
-		else 
-		{
-			MovieFlag = 0;
-			movieOff();
-		}
-		terminalPrint();
-	}
-	if(key == 'c')  // Recenter image
-	{
-		CenterX = 0.0;
-		CenterY = 0.0;
-		CenterZ = 0.0;
-		drawPicture();
-		terminalPrint();
-	}
-}
-
-void mymouse(int button, int state, int x, int y)
-{	
-	//float myX, myY, myZ;
-	//int index = -1;
-	
-	if(state == GLUT_DOWN)
-	{
-		if(button == GLUT_LEFT_BUTTON)
-		{
-			printf("\n Left mouse button down");
-			printf("\n mouse x = %d mouse y = %d\n", x, y);
-			//myX = (2.0*x/XWindowSize - 1.0)*RadiusOfCavity;
-			//myY = (-2.0*y/YWindowSize + 1.0)*RadiusOfCavity;
-		}
-		else
-		{
-			printf("\nRight mouse button down");
-			printf("\nmouse x = %d mouse y = %d\n", x, y);
-			//myX = (2.0*x/XWindowSize - 1.0)*RadiusOfAtria;
-			//myY = (-2.0*y/YWindowSize + 1.0)*RadiusOfAtria;
-		}
-		//printf("\nSNx = %f SNy = %f SNz = %f\n", NodePosition[0].x, NodePosition[0].y, NodePosition[0].z);
-	}
-}
-
-string getTimeStamp()//for ss/videos
+string getTimeStamp()
 {
 	// Want to get a time stamp string representing current date/time, so we have a
 	// unique name for each video/screenshot taken.
@@ -160,61 +57,18 @@ string getTimeStamp()//for ss/videos
 		timeStamp = smonth.str() + "-" + sday.str() + '-' + syear.str() + "_" + stimeHour.str() + "." + stimeMin.str() +
 					"." + stimeSec.str();
 	return timeStamp;
-
-void movieOn()
-{
-	string ts = getTimeStamp();
-	ts.append(".mp4");
-
-	// Setting up the movie buffer.
-	const char* cmd = "ffmpeg -loglevel quiet -r 60 -f rawvideo -pix_fmt rgba -s 1000x1000 -i - "
-		      "-threads 0 -preset fast -y -pix_fmt yuv420p -crf 21 -vf vflip output.mp4";
-
-	string baseCommand = "ffmpeg -loglevel quiet -r 60 -f rawvideo -pix_fmt rgba -s 1000x1000 -i - "
-				"-c:v libx264rgb -threads 0 -preset fast -y -pix_fmt yuv420p -crf 0 -vf vflip ";
-
-	string z = baseCommand + ts;
-
-	const char *ccx = z.c_str();
-	MovieFile = popen(ccx, "w");
-	//Buffer = new int[XWindowSize*YWindowSize];
-	Buffer = (int*)malloc(XWindowSize*YWindowSize*sizeof(int));
-	MovieOn = 1;
 }
 
-void movieOff()
-{
-	if(MovieOn == 1) 
-	{
-		pclose(MovieFile);
-	}
-	free(Buffer);
-	MovieOn = 0;
-}
-
-
-void screenShot()//yes
+void screenShot()
 {	
-	int pauseFlag;
 	FILE* ScreenShotFile;
 	int* buffer;
 
 	const char* cmd = "ffmpeg -loglevel quiet -framerate 60 -f rawvideo -pix_fmt rgba -s 1000x1000 -i - "
 				"-c:v libx264rgb -threads 0 -preset fast -y -crf 0 -vf vflip output1.mp4";
-	//const char* cmd = "ffmpeg -r 60 -f rawvideo -pix_fmt rgba -s 1000x1000 -i - "
-	//              "-threads 0 -preset fast -y -pix_fmt yuv420p -crf 21 -vf vflip output1.mp4";
+
 	ScreenShotFile = popen(cmd, "w");
 	buffer = (int*)malloc(XWindowSize*YWindowSize*sizeof(int));
-	
-	if(Pause == 0) 
-	{
-		Pause = 1;
-		pauseFlag = 0;
-	}
-	else
-	{
-		pauseFlag = 1;
-	}
 	
 	for(int i =0; i < 1; i++)
 	{
@@ -234,38 +88,228 @@ void screenShot()//yes
 	system("rm output1.mp4");
 	printf("\nScreenshot Captured: \n");
 	cout << "Saved as " << ts << ".jpeg" << endl;
-
 	
-	//system("ffmpeg -i output1.mp4 screenShot.jpeg");
-	//system("rm output1.mp4");
-	
-	Pause = pauseFlag;
-	//ffmpeg -i output1.mp4 output_%03d.jpeg
+	system("mv *.jpeg Stills/");
 }
 
-void helpMenu()//yes, but be sure to adjust for mp
+void movieOn()
 {
-	system("clear");
-	//Pause = 1;
-	printf("\n The simulation is paused.");
-	printf("\n");
-	printf("\n h: Help");
-	printf("\n q: Quit");
-	printf("\n r: Run/Pause (Toggle)");
-	//printf("\n g: View front half only/View full image (Toggle)");
-	printf("\n v: Orthogonal/Frustum projection (Toggle)");
-	printf("\n");
-	printf("\n m: Movie on/Movie off (Toggle)");
-	printf("\n S: Screenshot");
-	printf("\n");
-	printf("\n c: Recenter image");
-	printf("\n w: Counterclockwise rotation x-axis");
-	printf("\n s: Clockwise rotation x-axis");
-	printf("\n d: Counterclockwise rotation y-axis");
-	printf("\n a: Clockwise rotation y-axis");
-	printf("\n z: Counterclockwise rotation z-axis");
-	printf("\n Z: Clockwise rotation z-axis");
-	printf("\n e: Zoom in");
-	printf("\n E: Zoom out");
-	printf("\n");
+	string ts = getTimeStamp();
+	ts.append(".mp4");
+
+	string baseCommand = "ffmpeg -loglevel quiet -r 60 -f rawvideo -pix_fmt rgba -s 1000x1000 -i - "
+				"-c:v libx264rgb -threads 0 -preset fast -y -pix_fmt yuv420p -crf 0 -vf vflip ";
+
+	string z = baseCommand + ts;
+	const char *ccx = z.c_str();
+	MovieFile = popen(ccx, "w");
+	Buffer = (int*)malloc(XWindowSize*YWindowSize*sizeof(int));
 }
+
+void movieOff()
+{
+	pclose(MovieFile);
+	free(Buffer);
+	system("mv *.mp4 Videos/");
+}
+
+
+void KeyPressed(unsigned char key, int x, int y)
+{	
+	cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
+	float dAngle = 0.01;
+	float zoom = 0.01;
+	float temp;
+	
+	if(key == 'q')
+	{
+		if(MovieFlag == 1) 
+		{
+			movieOff();
+		}
+		glutDestroyWindow(Window);
+		printf("\n Good Bye \n");
+		exit(0);
+	}
+	
+	if(key == 'v') // Orthoganal/Fulstrium view
+	{
+		if(ViewFlag == 0) 
+		{
+			ViewFlag = 1;
+			fulstrumView();
+		}
+		else 
+		{
+			ViewFlag = 0;
+			orthoganialView();
+		}
+		drawPicture();
+		terminalPrint();
+	}
+	
+	if(key == 'r')
+	{
+		if(Pause == 1) 
+		{
+			Pause = 0;
+			terminalPrint();
+		}
+		else 
+		{
+			Pause = 1;
+			terminalPrint();
+		}
+	}
+	if(key == 'm')
+	{
+		if(MovieFlag == 0) 
+		{
+			MovieFlag = 1;
+			movieOn();
+			terminalPrint();
+		}
+		else 
+		{
+			MovieFlag = 0;
+			movieOff();
+			terminalPrint();
+		}	
+	}
+	if(key == 'c')
+	{
+		screenShot();
+	}
+	
+	// Rotate clockwise on the y-axis
+	if(key ==  'l')
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x -= CenterOfSimulation.x;
+			BodyPosition[i].y -= CenterOfSimulation.y;
+			BodyPosition[i].z -= CenterOfSimulation.z;
+			temp =  cos(-dAngle)*BodyPosition[i].x + sin(-dAngle)*BodyPosition[i].z;
+			BodyPosition[i].z  = -sin(-dAngle)*BodyPosition[i].x + cos(-dAngle)*BodyPosition[i].z;
+			BodyPosition[i].x  = temp;
+			BodyPosition[i].x += CenterOfSimulation.x;
+			BodyPosition[i].y += CenterOfSimulation.y;
+			BodyPosition[i].z += CenterOfSimulation.z;
+		}
+		drawPicture();
+		AngleOfSimulation.y -= dAngle;
+	}
+	if(key == 'k')  // Rotate counter clockwise on the y-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x -= CenterOfSimulation.x;
+			BodyPosition[i].y -= CenterOfSimulation.y;
+			BodyPosition[i].z -= CenterOfSimulation.z;
+			temp = cos(dAngle)*BodyPosition[i].x + sin(dAngle)*BodyPosition[i].z;
+			BodyPosition[i].z  = -sin(dAngle)*BodyPosition[i].x + cos(dAngle)*BodyPosition[i].z;
+			BodyPosition[i].x  = temp;
+			BodyPosition[i].x += CenterOfSimulation.x;
+			BodyPosition[i].y += CenterOfSimulation.y;
+			BodyPosition[i].z += CenterOfSimulation.z;
+		}
+		drawPicture();
+		AngleOfSimulation.y += dAngle;
+	}
+	if(key == 'a')  // Translate left on the x-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x -= zoom;
+		}
+		CenterOfSimulation.x -= zoom;
+		drawPicture();
+	}
+	if(key == 'd')  // Translate right on the x-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x += zoom;
+		}
+		CenterOfSimulation.x += zoom;
+		drawPicture();
+	}
+	if(key == 's')  // Translate down on the y-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].y -= zoom;
+		}
+		CenterOfSimulation.y -= zoom;
+		drawPicture();
+	}
+	if(key == 'w')  // Translate up on the y-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].y += zoom;
+		}
+		CenterOfSimulation.y += zoom;
+		drawPicture();
+	}
+	if(key == 'z')  // Translate out on the z-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].z -= zoom;
+		}
+		CenterOfSimulation.z -= zoom;
+		drawPicture();
+	}
+	if(key == 'Z')  // Translate in on the z-axis
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].z += zoom;
+		}
+		CenterOfSimulation.z += zoom;
+		drawPicture();
+	}
+	if(key == 'f')  // Recenter
+	{
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x -= CenterOfSimulation.x;
+			BodyPosition[i].y -= CenterOfSimulation.y;
+			BodyPosition[i].z -= CenterOfSimulation.z;
+		}
+		CenterOfSimulation.x = 0.0;
+		CenterOfSimulation.y = 0.0;
+		CenterOfSimulation.z = 0.0;
+		CenterOfSimulation.w = 0.0;
+		drawPicture();
+	}
+	
+	cudaMemcpy( BodyPositionGPU, BodyPosition, NumberOfBodies*sizeof(float4), cudaMemcpyHostToDevice );
+}
+
+void mymouse(int button, int state, int x, int y)
+{	
+	//float myX, myY, myZ;
+	//int index = -1;
+	
+	if(state == GLUT_DOWN)
+	{
+		if(button == GLUT_LEFT_BUTTON)
+		{
+			//printf("\n Left mouse button down");
+			//printf("\n mouse x = %d mouse y = %d\n", x, y);
+			//myX = (2.0*x/XWindowSize - 1.0)*RadiusOfCavity;
+			//myY = (-2.0*y/YWindowSize + 1.0)*RadiusOfCavity;
+		}
+		else
+		{
+			//printf("\nRight mouse button down");
+			//printf("\nmouse x = %d mouse y = %d\n", x, y);
+			//myX = (2.0*x/XWindowSize - 1.0)*RadiusOfAtria;
+			//myY = (-2.0*y/YWindowSize + 1.0)*RadiusOfAtria;
+		}
+		//printf("\nSNx = %f SNy = %f SNz = %f\n", BodyPositionPosition[0].x, BodyPositionPosition[0].y, BodyPositionPosition[0].z);
+	}
+}
+
