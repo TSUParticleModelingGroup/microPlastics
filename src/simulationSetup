@@ -1,31 +1,32 @@
 In this file do not use the equal sign in a comment because that is the triger to read an input.
 
 
-
 NumberOfMicroPlastics = 20;
 
 DensityOfMicroPlastic = 1.0;
 
-DiameterOfMicroPlasticMax = 0.5;
+DiameterOfMicroPlasticMax = 0.1;
 
-DiameterOfMicroPlasticMin = 0.01;
+DiameterOfMicroPlasticMin = 0.2;
 
 NumberOfPolymerChains = 20;
 
-PolymersChainLengthMax = 555;
+PolymersChainLengthMax = 20;
 
-PolymersChainLengthMin = 2;
+PolymersChainLengthMin = 5;
 
-PolymersConnectionLength = 0.000001;
+PolymersConnectionLength = 0.051;
 
 DensityOfPolymer = 1.0;
 
-DiameterOfPolymer = 0.5;
+DiameterOfPolymer = 0.05;
 
-Drag = 11.2;
+Drag = 1.1;
 
 TotalRunTime = 100000.0;
 
 Dt = 0.001;
 
 DrawRate = 20;
+
+PrintRate = 20;
