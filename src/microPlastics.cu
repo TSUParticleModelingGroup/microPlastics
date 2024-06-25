@@ -28,18 +28,23 @@ int MovieFlag; // 0 movie off, 1 movie on
 
 // Globals to be read in from parameter file.
 int NumberOfMicroPlastics;
-float DensityOfMicroPlastic;
-float DiameterOfMicroPlasticMax;
+float DensityOfMicroPlasticMin;
+float DensityOfMicroPlasticMax;
 float DiameterOfMicroPlasticMin;
+float DiameterOfMicroPlasticMax;
 
 int NumberOfPolymerChains;
-int NumberOfPolymers;
-int PolymersChainLengthMax;
 int PolymersChainLengthMin;
+int PolymersChainLengthMax;
+
 float PolymersConnectionLength;
 float DensityOfPolymer;
 float DiameterOfPolymer;
 
+float BeakerRadius; //4900.0;
+float FluidHeight; //118000.0;
+
+float FluidDensity;
 float Drag;
 
 float TotalRunTime;
@@ -47,10 +52,19 @@ float Dt;
 int DrawRate;
 int PrintRate;
 
+float PolymerRed;
+float PolymerGreen;
+float PolymerBlue;
+
+float MicroPlasticRed;
+float MicroPlasticGreen;
+float MicroPlasticBlue;
+
 // Other Globals
 int Pause;
 int ViewFlag; // 0 orthoganal, 1 fulstum
 int NumberOfBodies;
+int NumberOfPolymers;
 float4 *BodyPosition, *BodyVelocity, *BodyForce;
 float4 *BodyPositionGPU, *BodyVelocityGPU, *BodyForceGPU;
 int *PolymerChainLength;
@@ -61,8 +75,9 @@ int DrawTimer, PrintTimer;
 float RunTime;
 float4 CenterOfSimulation;
 float4 AngleOfSimulation;
-float BeakerRadius = 4900.0;
-float BeakerHeight = 118000.0;
+
+int RadialConfinementViewingAids = 1;
+
 
 // Window globals
 static int Window;
@@ -106,22 +121,25 @@ void readSimulationParameters()
 		data >> NumberOfMicroPlastics;
 		
 		getline(data,name,'=');
-		data >> DensityOfMicroPlastic;
-		
+		data >> DensityOfMicroPlasticMin;
+
 		getline(data,name,'=');
-		data >> DiameterOfMicroPlasticMax;
+		data >> DensityOfMicroPlasticMax;
 		
 		getline(data,name,'=');
 		data >> DiameterOfMicroPlasticMin;
+
+		getline(data,name,'=');
+		data >> DiameterOfMicroPlasticMax;
 		
 		getline(data,name,'=');
 		data >> NumberOfPolymerChains;
 		
 		getline(data,name,'=');
-		data >> PolymersChainLengthMax;
-		
-		getline(data,name,'=');
 		data >> PolymersChainLengthMin;
+
+		getline(data,name,'=');
+		data >> PolymersChainLengthMax;
 		
 		getline(data,name,'=');
 		data >> PolymersConnectionLength;
@@ -132,6 +150,15 @@ void readSimulationParameters()
 		getline(data,name,'=');
 		data >> DiameterOfPolymer;
 		
+		getline(data,name,'=');
+		data >> BeakerRadius;
+
+		getline(data,name,'=');
+		data >> FluidHeight;
+
+		getline(data,name,'=');
+		data >> FluidDensity;
+
 		getline(data,name,'=');
 		data >> Drag;
 		
@@ -146,6 +173,25 @@ void readSimulationParameters()
 		
 		getline(data,name,'=');
 		data >> PrintRate;
+
+		getline(data,name,'=');
+		data >> PolymerRed;
+
+		getline(data,name,'=');
+		data >> PolymerGreen;
+
+		getline(data,name,'=');
+		data >> PolymerBlue;
+
+		getline(data,name,'=');
+		data >> MicroPlasticRed;
+
+		getline(data,name,'=');
+		data >> MicroPlasticGreen;
+
+		getline(data,name,'=');
+		data >> MicroPlasticBlue;
+		
 	}
 	else
 	{
@@ -154,6 +200,34 @@ void readSimulationParameters()
 	}
 	data.close();
 	
+	/*
+	//prinf all the parameters
+	printf("\n\n Number of MicroPlastics = %d", NumberOfMicroPlastics);
+	printf("\n DensityOfMicroPlasticMin = %f", DensityOfMicroPlasticMin);
+	printf("\n DensityOfMicroPlasticMax = %f", DensityOfMicroPlasticMax);
+	printf("\n DiameterOfMicroPlasticMin = %f", DiameterOfMicroPlasticMin);
+	printf("\n DiameterOfMicroPlasticMax = %f", DiameterOfMicroPlasticMax);
+	printf("\n NumberOfPolymerChains = %d", NumberOfPolymerChains);
+	printf("\n PolymersChainLengthMin = %d", PolymersChainLengthMin);
+	printf("\n PolymersChainLengthMax = %d", PolymersChainLengthMax);
+	printf("\n PolymersConnectionLength = %f", PolymersConnectionLength);
+	printf("\n DensityOfPolymer = %f", DensityOfPolymer);
+	printf("\n DiameterOfPolymer = %f", DiameterOfPolymer);
+	printf("\n BeakerRadius = %f", BeakerRadius);
+	printf("\n FluidHeight = %f", FluidHeight);
+	printf("\n FluidDensity = %f", FluidDensity);
+	printf("\n Drag = %f", Drag);
+	printf("\n TotalRunTime = %f", TotalRunTime);
+	printf("\n Dt = %f", Dt);
+	printf("\n DrawRate = %d", DrawRate);
+	printf("\n PrintRate = %d", PrintRate);
+	printf("\n PolymerRed = %f", PolymerRed);
+	printf("\n PolymerGreen = %f", PolymerGreen);
+	printf("\n PolymerBlue = %f", PolymerBlue);
+	printf("\n MicroPlasticRed = %f", MicroPlasticRed);
+	printf("\n MicroPlasticGreen = %f", MicroPlasticGreen);
+	printf("\n MicroPlasticBlue = %f", MicroPlasticBlue);
+	*/
 	printf("\n\n Parameter file has been read");
 	printf("\n");
 }
@@ -242,32 +316,34 @@ void setInitailConditions()
 		BodyPosition[i].w = ((float)rand()/(float)RAND_MAX)*(DiameterOfMicroPlasticMax - DiameterOfMicroPlasticMin) + DiameterOfMicroPlasticMin;
 		BodyForce[i].w = 1.0; // (4.0/3.0)*PI*(BodyPosition[i].w/2.0)*(BodyPosition[i].w/2.0)*(BodyPosition[i].w/2.0);	
 	}
-	
+	printf("a\n");
 	// Setting intial pos of polymers
 	int k = 0;
 	int test = 0;
+	float TotalPolymerLength;
 	for(int i = 0; i < NumberOfPolymerChains; i++)
 	{
 		test = 0;
+		TotalPolymerLength = ((PolymersConnectionLength+DiameterOfPolymer) * PolymerChainLength[i]);
 		for(int j = 0; j < PolymerChainLength[i]; j++)
 		{
 			if(j == 0)
 			{
 				startId = k;
 				float angle = 2.0*PI*(float)rand()/(float)RAND_MAX;
-				BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * cos(angle));
-				BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * sin(angle));
+				BodyPosition[k].x = ((float)rand()/(float)RAND_MAX)*(BeakerRadius * cos(angle));
+				BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*(BeakerRadius * sin(angle));
 
 				if(i > 0)
 				{
 					for(int l = 0; l < k-1; l++)
 					{
 						float dx = BodyPosition[k].x-BodyPosition[l].x;
-						float dy = BodyPosition[k].y-BodyPosition[l].y;
-						float d2  = dx*dx + dy*dy;
+						float dz = BodyPosition[k].z-BodyPosition[l].z;
+						float d2  = dx*dx + dz*dz;
 						float d = sqrt(d2);
 						
-						if(d < 3*DiameterOfPolymer)
+						if(d < DiameterOfPolymer)
 						{
 							test = 1;
 							/*
@@ -284,17 +360,21 @@ void setInitailConditions()
 
 							printf("detected at i = %d, j = %d\n", i, j);
 							*/
+							printf("d = %f\n", d);
 							i--;
+							printf("break 1\n");
 							break;
 						}
 					}
 				}
 				if(test == 1)
 				{
+					printf("break 2\n");
+					test = 0;
 					break;
 				}
 
-				BodyPosition[k].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerHeight - PolymersChainLengthMax*DiameterOfPolymer);
+				BodyPosition[k].y = ((float)rand()/(float)RAND_MAX)*(FluidHeight - TotalPolymerLength) +  TotalPolymerLength;
 				PolymerConnectionA[k] = -1;
 				if(j+1 < PolymerChainLength[i]) PolymerConnectionB[k] = k+1;
 				else PolymerConnectionB[k] = -1;
@@ -302,15 +382,16 @@ void setInitailConditions()
 			}
 			else
 			{
-				BodyPosition[k].x = BodyPosition[startId].x + j*(PolymersConnectionLength+0.005);
-				BodyPosition[k].y = BodyPosition[startId].y;
+				
+				BodyPosition[k].x = BodyPosition[startId].x;
+				BodyPosition[k].y = BodyPosition[startId].y - j*(PolymersConnectionLength+DiameterOfPolymer);
 				BodyPosition[k].z = BodyPosition[startId].z;
 				PolymerConnectionA[k] = k-1;
 				if(j+1 < PolymerChainLength[i]) PolymerConnectionB[k] = k+1;
 				else PolymerConnectionB[k] = -1;
 				k++;
 			}
-			/*
+			
 			//for debugging, print all polymer positions
 			printf("\n\nPolymer");
 			printf("\n i = %d", i);
@@ -320,7 +401,7 @@ void setInitailConditions()
 			printf("\n x = %f", BodyPosition[i].x);
 			printf("\n y = %f", BodyPosition[i].y);
 			printf("\n z = %f", BodyPosition[i].z);
-			*/
+			
 		}
 	}
 	
@@ -333,9 +414,10 @@ void setInitailConditions()
 	for(int i = NumberOfPolymers; i < NumberOfBodies; i++)
 	{
 		float angle = 2.0*PI*(float)rand()/(float)RAND_MAX;
-		BodyPosition[i].x = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * cos(angle));
-		BodyPosition[i].y = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerRadius * sin(angle));
-		BodyPosition[i].z = ((float)rand()/(float)RAND_MAX)*2.0 - 1.0; //(BeakerHeight - 10.0*DiameterOfMicroPlasticMax);
+		BodyPosition[i].x = ((float)rand()/(float)RAND_MAX)*(BeakerRadius * cos(angle));
+		BodyPosition[i].y = ((float)rand()/(float)RAND_MAX)*(FluidHeight - DiameterOfMicroPlasticMax);
+		BodyPosition[i].z = ((float)rand()/(float)RAND_MAX)*(BeakerRadius * sin(angle));
+
 
 		//check for overlap with other bodies
 		for(int j = 0; j < i-1; j++)
@@ -346,15 +428,15 @@ void setInitailConditions()
 			float d2  = dx*dx + dy*dy + dz*dz;
 			float d = sqrt(d2);
 			
-			if(d < 1.5 * DiameterOfMicroPlasticMax)
+			if(d < DiameterOfMicroPlasticMax)
 			{
 				i--;
 				break;
 			}
 		}
 
-		/*for debugging
-		printf("\n\nMicroPlastics Start Here\n\n");
+		//for debugging
+		printf("\n\nMicroPlastic\n\n");
 		printf("\n\n i = %d", i);
 		printf("\n\n k = %d", k);
 		printf("\n\n x = %f", BodyPosition[i].x);
@@ -363,9 +445,8 @@ void setInitailConditions()
 		//just to be safe, do angle and radius again
 		printf("\n\n angle = %f", angle);
 		printf("\n\n radius = %f", BeakerRadius);
-		*/
 	}
-	printf("\n\n Initail conditions have been set.");
+	printf("\n\n Initial conditions have been set.");
 	printf("\n");
 }
 
@@ -376,7 +457,7 @@ void drawPicture()
 	
 	for(int i = 0; i < NumberOfPolymers; i++)
 	{
-		glColor3d(0.0, 1.0, 0.0);
+		glColor3d(PolymerRed, PolymerGreen, PolymerBlue);
 		glPushMatrix();
 			glTranslatef(BodyPosition[i].x, BodyPosition[i].y, BodyPosition[i].z);
 			glutSolidSphere(BodyPosition[i].w/2.0, 30, 30);
@@ -385,16 +466,48 @@ void drawPicture()
 	
 	for(int i = NumberOfPolymers; i < NumberOfBodies; i++)
 	{
-		glColor3d(1.0, 1.0, 1.0);
+		glColor3d(MicroPlasticRed, MicroPlasticGreen, MicroPlasticBlue);
 		glPushMatrix();
 			glTranslatef(BodyPosition[i].x, BodyPosition[i].y, BodyPosition[i].z);
 			glutSolidSphere(BodyPosition[i].w/2.0, 30, 30);
 		glPopMatrix();
 	}
-	
+
+	glColor3d(1.0, 0.0, 0.0);
+		glPushMatrix();
+			glTranslatef(0, 0, 0);
+			glutSolidSphere(500, 30, 30);
+		glPopMatrix();
+
+	RadialConfinementViewingAids = 1;
+	if(RadialConfinementViewingAids == 1)
+	{
+		glLineWidth(1.0);
+		float divitions = 60.0;
+		float angle = 2.0*PI/divitions;
+		
+		// Drawing top ring.
+		glColor3d(0.0,1.0,0.0);
+		for(int i = 0; i < divitions; i++)
+		{
+			glBegin(GL_LINES);
+				glVertex3f(sin(angle*i)*BeakerRadius, FluidHeight, cos(angle*i)*BeakerRadius);
+				glVertex3f(sin(angle*(i+1))*BeakerRadius, FluidHeight, cos(angle*(i+1))*BeakerRadius);
+			glEnd();
+		}
+		
+		// Drawing the bottom ring.
+		glColor3d(1.0,1.0,1.0);
+		for(int i = 0; i < divitions; i++)
+		{
+			glBegin(GL_LINES);
+				glVertex3f(sin(angle*i)*BeakerRadius, 0.0, cos(angle*i)*BeakerRadius);
+				glVertex3f(sin(angle*(i+1))*BeakerRadius, 0.0, cos(angle*(i+1))*BeakerRadius);
+			glEnd();
+		}
+	}
 	glutSwapBuffers();
-	
-	
+
 	if(MovieFlag == 1)
 	{
 		glReadPixels(5, 5, XWindowSize, YWindowSize, GL_RGBA, GL_UNSIGNED_BYTE, Buffer);
@@ -831,9 +944,14 @@ void setup()
 	AngleOfSimulation.y = 1.0;
 	AngleOfSimulation.z = 0.0;
 	AngleOfSimulation.w = 0.0;
+	printf(" BeakerRadius = %f\n", BeakerRadius);
+	printf(" FluidHeight = %f\n", FluidHeight);
+	//exit(0);
 	
 	terminalPrint();
 }
+
+	
 
 int main(int argc, char** argv)
 {
@@ -845,12 +963,12 @@ int main(int argc, char** argv)
 
 	// Clip plains
 	Near = 0.2;
-	Far = 30.0;
+	Far = BeakerRadius*6.0;
 
 	//Direction here your eye is located location
 	EyeX = 0.0;
-	EyeY = 0.0;
-	EyeZ = 2.0;
+	EyeY = BeakerRadius;
+	EyeZ = BeakerRadius*2.0;
 
 	//Where you are looking
 	CenterX = 0.0;
