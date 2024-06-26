@@ -28,8 +28,8 @@ int MovieFlag; // 0 movie off, 1 movie on
 
 // Globals to be read in from parameter file.
 int NumberOfMicroPlastics;
-float DensityOfMicroPlasticMin;
-float DensityOfMicroPlasticMax;
+double DensityOfMicroPlasticMin;
+double DensityOfMicroPlasticMax;
 float DiameterOfMicroPlasticMin;
 float DiameterOfMicroPlasticMax;
 
@@ -38,7 +38,7 @@ int PolymersChainLengthMin;
 int PolymersChainLengthMax;
 
 float PolymersConnectionLength;
-float DensityOfPolymer;
+double DensityOfPolymer;
 float DiameterOfPolymer;
 
 float BeakerRadius; //4900.0;
@@ -479,7 +479,6 @@ void drawPicture()
 			glutSolidSphere(500, 30, 30);
 		glPopMatrix();
 
-	RadialConfinementViewingAids = 1;
 	if(RadialConfinementViewingAids == 1)
 	{
 		glLineWidth(1.0);
@@ -493,6 +492,15 @@ void drawPicture()
 			glBegin(GL_LINES);
 				glVertex3f(sin(angle*i)*BeakerRadius, FluidHeight, cos(angle*i)*BeakerRadius);
 				glVertex3f(sin(angle*(i+1))*BeakerRadius, FluidHeight, cos(angle*(i+1))*BeakerRadius);
+			glEnd();
+		}
+
+		glColor3d(0.0,1.0,0.0);
+		for(int i = 0; i < divitions; i++)
+		{
+			glBegin(GL_LINES);
+				glVertex3f(sin(angle*i)*BeakerRadius, 0.0, cos(angle*i)*BeakerRadius);
+				glVertex3f(sin(angle*(i))*BeakerRadius, FluidHeight, cos(angle*(i))*BeakerRadius);
 			glEnd();
 		}
 		
@@ -748,8 +756,8 @@ __global__ void getForces(float4 *pos, float4 *vel, float4 *force, int *linkA, i
 				    	forceSum.x += force_mag.x;
 				    	forceSum.y += force_mag.y;
 				    	forceSum.z += force_mag.z;
-			    	}
-		   	 }
+			    }
+		   	}
 		}
 		
 		force[myId].x = forceSum.x;
@@ -840,7 +848,7 @@ void errorCheck(const char *message)
 
 void terminalPrint()
 {
-	//system("clear");
+	system("clear");
 	//printf("\033[0;34m"); // blue.
 	//printf("\033[0;36m"); // cyan
 	//printf("\033[0;33m"); // yellow
@@ -853,7 +861,7 @@ void terminalPrint()
 	printf("\n **************************** Simulation Stats ****************************");
 	printf("\033[0m");
 	
-	printf("\n Total run time = %7.2f *time units*", RunTime);
+	printf("\n Total run time = %7.2f milliseconds", RunTime);
 	
 	printf("\033[0;33m");
 	printf("\n **************************** Terminal Comands ****************************");
@@ -897,6 +905,17 @@ void terminalPrint()
 	{
 		printf("\033[0;32m");
 		printf(BOLD_ON "Video Recording On" BOLD_OFF);
+	}
+	printf("\n e: Radial Confinement Viewing Aid   - ");
+	if(RadialConfinementViewingAids == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Radial Confinement Viewing Aid Off" BOLD_OFF);
+	}
+	else 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Radial Confinement Viewing Aid On" BOLD_OFF);
 	}
 	
 	printf("\n");
@@ -967,8 +986,8 @@ int main(int argc, char** argv)
 
 	//Direction here your eye is located location
 	EyeX = 0.0;
-	EyeY = BeakerRadius;
-	EyeZ = BeakerRadius*2.0;
+	EyeY = FluidHeight+ 100;
+	EyeZ = 1.0;
 
 	//Where you are looking
 	CenterX = 0.0;

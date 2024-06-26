@@ -41,12 +41,13 @@ DiameterOfPolymer = 45;
 ******************** Confinement INFO **************************************
 
 This is the radius of the beaker in micrometers.
-Standard Beaker Radius is 4900 micrometers 20
-BeakerRadius = 4900.0;
+Standard Beaker Radius is 4900 micrometers 20 
+87mm outside diamter, standard looks to be 5mm thick, so 38.5 mm?
+BeakerRadius = 38500.0;
 
 This is the height of the fliud in the beaker in micrometers.
 Fluid height for this case is 118000 micrometers 100
-FluidHeight = 118000.0;
+FluidHeight = 91440.0;
 
 ******************** Fluid INFO **************************************
 

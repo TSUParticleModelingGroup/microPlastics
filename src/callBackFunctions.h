@@ -17,7 +17,7 @@ void orthoganialView()
 {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho(-1.0, 1.0, -1.0, 1.0, Near, Far);
+	glOrtho(-BeakerRadius, BeakerRadius, 0.0, FluidHeight, Near, Far); //I think this is what we want, definitely looks 2D
 	glMatrixMode(GL_MODELVIEW);
 	ViewFlag = 0;
 	drawPicture();
@@ -116,11 +116,13 @@ void movieOff()
 
 void KeyPressed(unsigned char key, int x, int y)
 {	
-	cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost ); // do we need this anymore??
-	float dAngle = 0.5;
-	float dx = 50;
-	float dy = 50;
-	float dz = 50;
+	cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
+	float dAngle = 0.01;
+	float dx = 100;
+	float dy = 100;
+	float dz = 100;
+	float temp;
+
 	if(key == 'q')
 	{
 		if(MovieFlag == 1) 
@@ -184,50 +186,83 @@ void KeyPressed(unsigned char key, int x, int y)
 	// Rotate clockwise on the y-axis
 	if(key ==  'l')
 	{
-		glRotatef(dAngle, 0,1,0);
+		/* //in case there is another way
+		glRotatef(dAngle, 0.0,1.0,0.0);
 			AngleOfSimulation.y += dAngle;
 			drawPicture();
+		*/
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x -= CenterOfSimulation.x;
+			BodyPosition[i].y -= CenterOfSimulation.y;
+			BodyPosition[i].z -= CenterOfSimulation.z;
+			temp =  cos(-dAngle)*BodyPosition[i].x + sin(-dAngle)*BodyPosition[i].z;
+			BodyPosition[i].z  = -sin(-dAngle)*BodyPosition[i].x + cos(-dAngle)*BodyPosition[i].z;
+			BodyPosition[i].x  = temp;
+			BodyPosition[i].x += CenterOfSimulation.x;
+			BodyPosition[i].y += CenterOfSimulation.y;
+			BodyPosition[i].z += CenterOfSimulation.z;
+		}
+		drawPicture();
+		AngleOfSimulation.y -= dAngle;
+
 	}
 	if(key == 'k')  // Rotate counter clockwise on the y-axis, us glRotate
 	{
-		glRotatef(-dAngle, 0,1,0);
+		/* //in case there is another way
+		glRotatef(-dAngle, 0.0,1.0,0.0);
 			AngleOfSimulation.y -= dAngle;
 			drawPicture();
+		*/
+		for(int i = 0; i < NumberOfBodies; i++)
+		{
+			BodyPosition[i].x -= CenterOfSimulation.x;
+			BodyPosition[i].y -= CenterOfSimulation.y;
+			BodyPosition[i].z -= CenterOfSimulation.z;
+			temp = cos(dAngle)*BodyPosition[i].x + sin(dAngle)*BodyPosition[i].z;
+			BodyPosition[i].z  = -sin(dAngle)*BodyPosition[i].x + cos(dAngle)*BodyPosition[i].z;
+			BodyPosition[i].x  = temp;
+			BodyPosition[i].x += CenterOfSimulation.x;
+			BodyPosition[i].y += CenterOfSimulation.y;
+			BodyPosition[i].z += CenterOfSimulation.z;
+		}
+		drawPicture();
+		AngleOfSimulation.y += dAngle;
 	}
 	if(key == 'a')  // Translate left on the x-axis
 	{
 		glTranslatef(dx, 0.0, 0.0);
-			CenterOfSimulation.x += dx;
+			//CenterOfSimulation.x += dx;
 			drawPicture();
 	}
 	if(key == 'd')  // Translate right on the x-axis
 	{
 		glTranslatef(-dx, 0.0, 0.0);
-			CenterOfSimulation.x += -dx;
+			//CenterOfSimulation.x += -dx;
 			drawPicture();
 	}
 	if(key == 's')  // Translate down on the y-axis
 	{
-			glTranslatef(0.0, -dy, 0.0);
-			CenterOfSimulation.y += -dy;
+			glTranslatef(0.0, dy, 0.0);
+			//CenterOfSimulation.y += dy;
 			drawPicture();
 	}
 	if(key == 'w')  // Translate up on the y-axis
 	{
-		glTranslatef(0.0, dy, 0.0);
-			CenterOfSimulation.y += dy;
+		glTranslatef(0.0, -dy, 0.0);
+			//CenterOfSimulation.y += -dy;
 			drawPicture();
 	}
 	if(key == 'z')  // Translate out on the z-axis
 	{
 		glTranslatef(0.0, 0.0, -dz);
-			CenterOfSimulation.z += -dz;
+			//CenterOfSimulation.z += -dz;
 			drawPicture();
 	}
 	if(key == 'Z')  // Translate in on the z-axis
 	{
 		glTranslatef(0.0, 0.0, dz);
-			CenterOfSimulation.z += dz;
+			//CenterOfSimulation.z += dz;
 			drawPicture();
 	}
 	if(key == 'f')  // Recenter
@@ -239,8 +274,24 @@ void KeyPressed(unsigned char key, int x, int y)
 			CenterOfSimulation.w = 0.0;
 			drawPicture();
 	}
+	if(key == 'e')//toggle rings
+	{
+		if(RadialConfinementViewingAids == 0)
+		{
+			RadialConfinementViewingAids = 1;
+			terminalPrint();
+			drawPicture();
+		}
+		else
+		{
+			RadialConfinementViewingAids = 0;
+			terminalPrint();
+			drawPicture();
+		}
+
+	}
 	
-	cudaMemcpy( BodyPositionGPU, BodyPosition, NumberOfBodies*sizeof(float4), cudaMemcpyHostToDevice ); // do we need this anymore?
+	cudaMemcpy( BodyPositionGPU, BodyPosition, NumberOfBodies*sizeof(float4), cudaMemcpyHostToDevice );
 }
 
 void mymouse(int button, int state, int x, int y)
