@@ -65,6 +65,7 @@ float MicroPlasticBlue;
 // Other Globals
 int Pause;
 int ViewFlag; // 0 orthoganal, 1 fulstum
+int TopView;
 int NumberOfBodies;
 int NumberOfPolymers;
 float4 *BodyPosition, *BodyVelocity, *BodyForce;
@@ -77,7 +78,9 @@ dim3 Blocks, Grids;
 int DrawTimer, PrintTimer;
 float RunTime;
 float4 CenterOfSimulation;
+float4 DistanceFromCenter = make_float4(0.0, 0.0, 0.0, 0.0);
 float4 AngleOfSimulation;
+__device__ float ShakeItUpMag;
 
 int DebugFlag;
 int RadialConfinementViewingAids;
@@ -102,6 +105,8 @@ double UpX;
 double UpY;
 double UpZ;
 
+#include "./forceFunctions.h"
+
 // Prototyping functions
 void readSimulationParameters();
 void setNumberOfBodies();
@@ -114,17 +119,9 @@ void terminalPrint();
 void setup();
 
 __global__ void init_curand(unsigned int, curandState_t*);
-__device__ float4 brownian_motion(curandState_t*, int);
-__device__ float4 shakeItUp(curandState_t*, int);
-__device__ float4 getPolymerPolymerForce(float4 , float4 , int , int , int , float, int );
-__device__ float4 getPolymerMicroPlasticForce(float4 , float4 );
-__device__ float4 getMicroPlasticMicroPlasticForce(float4 , float4 );
-__device__ float4 getGravityForces(float , float , float );
-__device__ float4 getContainerForces(float4 , float , float );
-__device__ float4 getStirringForces(curandState_t* , int , float4 , float4 , float , float , float );
-__global__ void getForces(curandState_t* , float4 *, float4 *, float4 *, int *, int *, float , int , int , float , float , float , int , float , int );
-__global__ void getForcesSetup(curandState_t* , float4 *, float4 *, float4 *, int *, int *, float , int , int , float , float , float , int , float , int );
-__global__ void moveBodies(float4 *pos, float4 *, float4 *, float , float , int);
+__global__ void getForces(curandState_t*, float4 *, float4 *, float4 *, int *, int *, float, int, int, float, float, float, int, float, int );
+__global__ void getForcesSetup(curandState_t* , float4 *, float4 *, float4 *, int *, int *, float, int, int, float, float, float, int, float, int );
+__global__ void moveBodies(float4 *pos, float4 *, float4 *, float, float, int);
 
 #include "./callBackFunctions.h"
 
@@ -249,8 +246,7 @@ void readSimulationParameters()
 		printf("\n MicroPlasticGreen = %f", MicroPlasticGreen);
 		printf("\n MicroPlasticBlue = %f", MicroPlasticBlue);
 	}
-	printf("\n\n Parameter file has been read");
-	printf("\n");
+	printf("\n Parameter file has been read.\n");
 }
 
 void setNumberOfBodies()
@@ -281,7 +277,7 @@ void setNumberOfBodies()
 		printf("\n Total number of bodies = %d", NumberOfBodies);
 	}
 	
-	printf("\n\n Number of bodies has been set");
+	printf("\n Number of bodies has been set.\n");
 }
 
 void allocateMemory()
@@ -315,20 +311,68 @@ void allocateMemory()
 	
 	cudaMalloc((void**)&DevStates, NumberOfBodies * sizeof(curandState_t));
 	
-	printf("\n\n Memory has been allocated");
-	printf("\n");
+	printf("\n Memory has been allocated.\n");
+}
+
+/******************************************************************************
+ This function does most of the nbody work when shaking up the polymers for setup.
+*******************************************************************************/
+__global__ void getForcesSetup(curandState_t* states, float4 *pos, float4 *vel, float4 *force, int *linkA, int *linkB, float length, int nPolymer, int nPlastics, float beakerRadius, float fluidHeight, float fluidDensity, int stirFlag, float theta, int shakeItUpFlag)
+{
+	int myId, yourId;
+	float4 forceVector, forceVectorSum;
+	float4 posMe, posYou;
+	
+	myId = threadIdx.x + blockDim.x*blockIdx.x;
+    	if(myId < nPolymer)
+    	{
+		posMe.x = pos[myId].x;
+		posMe.y = pos[myId].y;
+		posMe.z = pos[myId].z;
+		posMe.w = pos[myId].w;
+		
+		forceVectorSum.x = 0.0;
+		forceVectorSum.y = 0.0;
+		forceVectorSum.z = 0.0;
+		
+		for(yourId = 0; yourId < nPolymer; yourId++)
+		{	
+			if(yourId != myId) // Making sure you are not working on youself.
+			{
+				posYou.x = pos[yourId].x;
+				posYou.y = pos[yourId].y;
+				posYou.z = pos[yourId].z;
+				posYou.w = pos[yourId].w;
+			
+				if(myId < nPolymer && yourId < nPolymer)
+				{
+					// Polymer-polymer force
+					forceVector = getPolymerPolymerForce(posMe, posYou, linkA[myId], linkB[myId], yourId, length, myId);
+				}
+				
+			    	forceVectorSum.x += forceVector.x;
+			    	forceVectorSum.y += forceVector.y;
+			    	forceVectorSum.z += forceVector.z;
+		    	}
+		}
+		
+		// This adds on the forces to keep the bodies in the container.
+		forceVector = getContainerForces(posMe, beakerRadius, fluidHeight);
+		forceVectorSum.x += forceVector.x;
+		forceVectorSum.y += forceVector.y;
+		forceVectorSum.z += forceVector.z;
+		
+		// Tranfering all the forces to my force function
+		force[myId].x += forceVectorSum.x;
+		force[myId].y += forceVectorSum.y;
+		force[myId].z += forceVectorSum.z;
+    	}
 }
 
 void polymerShakeUp(float4 *pos, float4 *vel, float4 *force, int *linkA, int *linkB, float length, int n, float drag, float dt, float beakerRadius, float fluidHeight)
 {
-	float dx, dy, dz, r2, r;
-	float penitration;
-	float k1 = 100.0;
-	float k2 = 100.0;
-	float forceMag;
 	float magx, magy, magz, mag;
-	float dragTemp;
-	float k = 100.0;
+	float dragTemp = drag;
 	
 	mag = 10.0;
 	float stopTime = 2.0;
@@ -388,105 +432,23 @@ void polymerShakeUp(float4 *pos, float4 *vel, float4 *force, int *linkA, int *li
 
 		}
 		
-		/*
-		cudaMemcpy( BodyPositionGPU, BodyPosition, NumberOfBodies*sizeof(float4), cudaMemcpyHostToDevice );
-		cudaMemcpy( BodyVelocityGPU, BodyVelocity, NumberOfBodies*sizeof(float4), cudaMemcpyHostToDevice );
 		cudaMemcpy( BodyForceGPU, BodyForce, NumberOfBodies*sizeof(float4), cudaMemcpyHostToDevice );
 		getForcesSetup<<<Grids, Blocks>>>(DevStates, BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, PolymerConnectionAGPU, PolymerConnectionBGPU, PolymersConnectionLength, NumberOfPolymers, NumberOfMicroPlastics, BeakerRadius, FluidHeight, FluidDensity, StirFlag, Theta, ShakeItUpFlag);
-		errorCheck("getForces");
+		errorCheck("getForcesSetup");
+		
 		moveBodies<<<Grids, Blocks>>>(BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, dragTemp, Dt, NumberOfBodies);
 		errorCheck("moveBodies");
-		cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
-		cudaMemcpy( BodyVelocity, BodyVelocityGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
 		cudaMemcpy( BodyForce, BodyForceGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
-		*/
-		
-		for(int i = 0; i < n; i++)
-		{
-			for(int j = i+1; j < n; j++)
-			{
-				dx = pos[j].x - pos[i].x;
-				dy = pos[j].y - pos[i].y;
-				dz = pos[j].z - pos[i].z;
-				r2 = dx*dx + dy*dy + dz*dz + 0.000001;
-				r = sqrt(r2);
-				penitration = (pos[i].w + pos[j].w)/2.0 - r;
-				
-				if(0.0 < penitration)
-				{
-					// PolymerPolymer shell repulsion
-					forceMag  = -k1*penitration*penitration;
-				}
-				else
-				{
-					// PolymerPolymer atraction
-					forceMag  = 0.0;
-				}
-				force[i].x += forceMag*dx/r;
-				force[i].y += forceMag*dy/r;
-				force[i].z += forceMag*dz/r;
-				
-				force[j].x -= forceMag*dx/r;
-				force[j].y -= forceMag*dy/r;
-				force[j].z -= forceMag*dz/r;
-
-				// Polymer chain connection forces.
-				if(linkA[i] != -1 && j == linkA[i])
-				{ 
-					forceMag  = -k2*(length - r);
-				}
-				else if(linkB[i] != -1 && j == linkB[i])
-				{ 
-					forceMag  = -k2*(length - r);
-				}
-				force[i].x += forceMag*dx/r;
-				force[i].y += forceMag*dy/r;
-				force[i].z += forceMag*dz/r;
-				
-				force[j].x -= forceMag*dx/r;
-				force[j].y -= forceMag*dy/r;
-				force[j].z -= forceMag*dz/r;
-			}
 			
-			dx = pos[i].x;
-			dz = pos[i].z;
-			r2 = dx*dx + dz*dz;
-			r = sqrt(r2);
-				
-			if(beakerRadius < r)
-			{
-				forceMag = k*(beakerRadius - r);
-				force[i].x = forceMag*pos[i].x/r;
-				force[i].z = forceMag*pos[i].z/r;
-			}
-			if(fluidHeight < pos[i].y)
-			{
-				forceMag = k*(fluidHeight - pos[i].y);
-				force[i].y = forceMag;
-			}
-			else if(pos[i].y < 0.0)
-			{
-				forceMag = -k*(pos[i].y);
-				force[i].y = forceMag;
-			}
-		}
-		
-		for(int i = 0; i < n; i++)
-		{	
-			vel[i].x += ((force[i].x-dragTemp*vel[i].x)/force[i].w)*dt;
-			vel[i].y += ((force[i].y-dragTemp*vel[i].y)/force[i].w)*dt;
-			vel[i].z += ((force[i].z-dragTemp*vel[i].z)/force[i].w)*dt;
-
-			pos[i].x += vel[i].x*dt;
-			pos[i].y += vel[i].y*dt;
-			pos[i].z += vel[i].z*dt;
-		}
-		
 		time += dt;
 	}
 	
-	printf("\n\n Polymers have been shoken up.");
-	printf("\n");
+	// Taking the shaken up polymers back to the GPU so that the microplastics can be added on.
+	cudaMemcpy( BodyPosition, BodyPositionGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
+	cudaMemcpy( BodyVelocity, BodyVelocityGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
+	cudaMemcpy( BodyForce, BodyForceGPU, NumberOfBodies*sizeof(float4), cudaMemcpyDeviceToHost );
+	
+	printf("\n Polymers have been shoken up.\n");
 }
 
 void setInitailConditions()
@@ -666,8 +628,7 @@ void setInitailConditions()
 		}
 	}
 		
-	printf("\n\n Initial conditions have been set.");
-	printf("\n");
+	printf("\n Initial conditions have been set.\n");
 }
 
 void drawPicture()
@@ -775,8 +736,8 @@ void drawPicture()
 	// Drawing the stirring.
 	if(StirFlag == 1)
 	{
-		glLineWidth(2.0);
-		glColor3d(1.0,0.0,0.0);
+		glLineWidth(6.0);
+		glColor3d(0.0,1.0,1.0);
 		glBegin(GL_LINES);
 			glVertex3f(0.0, 0.0, 0.0);
 			glVertex3f(BeakerRadius*cos(Theta), 0.0, BeakerRadius*sin(Theta));
@@ -793,6 +754,18 @@ void drawPicture()
 	}
 }
 
+void errorCheck(const char *message)
+{
+	cudaError_t  error;
+	error = cudaGetLastError();
+
+	if(error != cudaSuccess)
+	{
+		printf("\n CUDA ERROR: %s = %s\n", message, cudaGetErrorString(error));
+		exit(0);
+	}
+}
+
 /******************************************************************************
  This function initializes CUDA Rand making it so every thread can have its own set
  of random numbers.
@@ -803,328 +776,9 @@ __global__ void init_curand(unsigned int seed, curandState_t* states)
     curand_init(seed, idx, 0, &states[idx]);
 }
 
-/*
-void brownian_motion(float3 *force)
-{
-	int i,under_normal_curve;
-	float mag, angle1, angle2;
-	float x,y,normal_hieght,temp;
-	
-	temp = 4.0*g_drag*DT;
-	under_normal_curve = NO;
-	
-	while(under_normal_curve == NO)
-	{
-		x = 2.0*1.0*(float)rand()/RAND_MAX - 1.0;
-		y = 1.0*(float)rand()/RAND_MAX;
-		normal_hieght = 1.0*exp(-x*x/temp);
-		if(y <= normal_hieght)
-		{
-			mag = x;
-			under_normal_curve = YES;
-		}
-	}	
-	
-	for(i = 0; i < NUMBER_OF_BODIES; i++)
-	{
-		angle1 = PI*(float)rand()/RAND_MAX;
-		angle2 = 2.0*PI*(float)rand()/RAND_MAX;
-		force[i].x += mag*sinf(angle1)*cosf(angle2);
-		force[i].y += mag*sinf(angle1)*sinf(angle2);
-		force[i].z += mag*cosf(angle1);
-	}
-}
-*/
-
 /******************************************************************************
- This is the Brownian Motion function.
- Place any comments and papers you used to get parameters for this function here.
- The above commented out function is one I ased to get Brownian Motion in another project.
+ This function controlls all the forces that act on the bodies.
 *******************************************************************************/
-__device__ float4 brownian_motion(curandState_t* states, int id)
-{
-	float mag = 100.0;
-	float4 f;
-	float randx = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randy = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randz = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        
-        f.x = randx;
-        f.y = randy;
-        f.z = randz;
-	
-	return(f);
-}
-
-/******************************************************************************
- This function just shakes the whole system up
-*******************************************************************************/
-__device__ float4 shakeItUp(curandState_t* states, int id)
-{
-	float mag = 100.0;
-	float4 v;
-	float randx = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randy = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randz = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        
-        v.x = randx;
-        v.y = randy;
-        v.z = randz;
-	
-	return(v);
-}
-
-/******************************************************************************
- This is the Polymer to Polymer interaction function.
- Place any comments and papers you used to get parameters for this function here.
- 
-*******************************************************************************/                                 
-__device__ float4 getPolymerPolymerForce(float4 p0, float4 p1, int linkA, int linkB, int yourId, float length, int myId)
-{
-    float4 f;
-    float force;
-    float dx = p1.x - p0.x;
-    float dy = p1.y - p0.y;
-    float dz = p1.z - p0.z;
-    float r2 = dx*dx + dy*dy + dz*dz + 0.000001;
-    float r = sqrt(r2);
-    float penitration = (p0.w + p1.w)/2.0 - r;
-    float k1 = 100.0;
-    float k2 = 100.0;
-    
-    force  = 0.0;
-    
-    if(0.0 < penitration)
-    {
-    	// PolymerPolymer shell repulsion
-    	force  += -k1*penitration*penitration;
-    }
-    else
-    {
-    	// PolymerPolymer atraction
-    	force  += 0.0;
-    }
-    
-    // Polymer chain connection forces.
-    if(linkA != -1 && yourId == linkA)
-    { 
-    	force  += -k2*(length - r);
-    }
-    if(linkB != -1 && yourId == linkB)
-    { 
-    	force  += -k2*(length - r);
-    }
-    
-    f.x = force*dx/r;
-    f.y = force*dy/r;
-    f.z = force*dz/r;
-    
-    return(f);
-}
-
-/******************************************************************************
- This is the Polymer to micro-plastic interaction function.
- Place any comments and papers you used to get parameters for this function here.
-*******************************************************************************/
-__device__ float4 getPolymerMicroPlasticForce(float4 p0, float4 p1)
-{
-    float4 f;
-    float force;
-    float dx = p1.x - p0.x;
-    float dy = p1.y - p0.y;
-    float dz = p1.z - p0.z;
-    float r2 = dx*dx + dy*dy + dz*dz + 0.000001;
-    float r = sqrt(r2);
-    float G = 100.0;
-    float penitration = (p0.w + p1.w)/2.0 - r;
-    float k = 100.0;
-    
-    force  = 0.0;
- 
-    if(0.0 < penitration)
-    {
-    	// Polymer microPlastic shell repulsion.
-    	force  += -k*penitration*penitration;
-    }
-    else
-    {
-    	// Polymer microPlastic actraction
-    	force += G*(p0.w*p1.w)/r2;
-    	//force += 0.0;
-    	//printf("\n force = %f", force);
-    }
-    
-    f.x = force*dx/r;
-    f.y = force*dy/r;
-    f.z = force*dz/r;
-    return(f);
-}
-
-/******************************************************************************
- This is the micro-plasic to micro-plastic interaction function.
- Place any comments and papers you used to get parameters for this function here.
- Self-Assembled Plasmonic Nanoparticle Clusters: 
- https://www.science.org/doi/10.1126/science.1187949#editor-abstract
-*******************************************************************************/
-__device__ float4 getMicroPlasticMicroPlasticForce(float4 p0, float4 p1)
-{
-    float4 f;
-    float force;
-    float dx = p1.x - p0.x;
-    float dy = p1.y - p0.y;
-    float dz = p1.z - p0.z;
-    float r2 = dx*dx + dy*dy + dz*dz + 0.000001;
-    float r = sqrt(r2);
-    float penitration = (p0.w + p1.w)/2.0 - r;
-    float k = 100.0;
-    
-    force  = 0.0;
-    
-    if(0.0 < penitration)
-    {
-    	// MicroPlastic microPlastic shell repulsion.
-    	force  += -k*penitration*penitration;
-    }
-    else
-    {
-    	// MicroPlastic microPlastic actraction
-    	force  += 0.0;
-    }
-    
-    f.x = force*dx/r;
-    f.y = force*dy/r;
-    f.z = force*dz/r;
-    
-    return(f);
-}
-
-/******************************************************************************
- This is the gravity function add complexity at will.
-*******************************************************************************/
-__device__ float4 getGravityForces(float density, float mass, float fluidDensity)
-{
-	float4 f;
-	float G = 9.81; // When you take meters/second^2 to micrometers/millisecond^2 everything cancels out so you get 9.81
-	f.x = 0.0;
-	f.z = 0.0;
-	
-	// May want to do something more accurate. I just made a linear function that  pulled stuff dowm if its density is
-	// greater than the fluid pushed it up if its density is less than the fluid.
-	f.y = -G*mass*(density - fluidDensity);
-	
-	return(f);
-}
-
-/******************************************************************************
- This function keeps the bodies in the container.
-*******************************************************************************/
-__device__ float4 getContainerForces(float4 posMe, float beakerRadius, float fluidHeight)
-{
-	float4 f;
-	float force;
-	float r2 = posMe.x*posMe.x + posMe.z*posMe.z;
-	float r = sqrt(r2);
-	float k = 100.0;
-	
-	f.x = 0.0;
-	f.y = 0.0;
-	f.z = 0.0;
-	
-	if(beakerRadius < r)
-	{
-		force = k*(beakerRadius - r);
-		f.x = force*posMe.x/r;
-		f.z = force*posMe.z/r;
-	}
-	
-	if(fluidHeight < posMe.y)
-	{
-		force = k*(fluidHeight - posMe.y);
-		f.y = force;
-	}
-	else if(posMe.y < 0.0)
-	{
-		force = -k*(posMe.y);
-		f.y = force;
-	}
-	
-	return(f);
-}
-
-/******************************************************************************
- This is the stirring function add complexity at will.
-*******************************************************************************/
-__device__ float4 getStirringForces(curandState_t* states, int id, float4 posMe, float4 velMe, float beakerRadius, float fluidHeight, float theta)
-{
-	float4 f;
-	float angle;
-	float magRand = 1000.0;
-	float centerMag;
-	//float temp;
-	float magStir = 20.0; 
-	//float mag2 = 10.0;
-	float r2 = posMe.x*posMe.x + posMe.z*posMe.z;
-	float r = sqrt(r2);
-	float range = PI/24.0;
-	
-	float randx = magRand*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randy = magRand*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randz = magRand*(curand_uniform(&states[id])*2.0 - 1.0);
-	
-	f.x = 0.0;
-	f.y = 0.0;
-	f.z = 0.0;
-	
-	if(0.0 < r)
-	{
-		// This gives a radial motion
-		//f.x = mag1*(-posMe.z/r);
-		//f.z = mag1*(posMe.x/r);
-		
-		// This gives a pulling down in the center and up on the sides.
-		//f.y = mag2*(r*2.0/beakerRadius - 1.0);
-		
-		// This is suposed to move it in from the top and out on the bottom.
-		//temp = 10.0*(1.0 - posMe.y/fluidHeight); //mag2*(-r*2.0/beakerRadius + 1.0);
-		//f.x = temp*(posMe.x/r);
-		//f.z = temp*(posMe.z/r);
-		
-		angle = atan(posMe.z/posMe.x);
-		if(0.0 < posMe.x)
-		{
-			if(0.0 < posMe.z)
-			{
-				angle += 0.0;
-			}
-			else
-			{
-				angle += 2.0*PI;
-			}
-		}
-		else
-		{
-			if(0.0 < posMe.z)
-			{
-				angle += PI;
-			}
-			else
-			{
-				angle += PI;
-			}
-		}
-		
-		if(0.0 < (angle - theta) < range)
-		{
-			centerMag = -(r/beakerRadius - 1.0)*(r/beakerRadius - 1.0) + 1.0; // This makes it full in the middle and die off on the ends,
-			f.x = randx + centerMag*magStir*(-posMe.z/r);
-			f.y = randy;
-			f.z = randz + centerMag*magStir*(posMe.x/r);
-		}
-	}
-	
-	return(f);
-}
-
 __global__ void getForces(curandState_t* states, float4 *pos, float4 *vel, float4 *force, int *linkA, int *linkB, float length, int nPolymer, int nPlastics, float beakerRadius, float fluidHeight, float fluidDensity, int stirFlag, float theta, int shakeItUpFlag)
 {
 	int myId, yourId;
@@ -1242,67 +896,9 @@ __global__ void getForces(curandState_t* states, float4 *pos, float4 *vel, float
     	}
 }
 
-__global__ void getForcesSetup(curandState_t* states, float4 *pos, float4 *vel, float4 *force, int *linkA, int *linkB, float length, int nPolymer, int nPlastics, float beakerRadius, float fluidHeight, float fluidDensity, int stirFlag, float theta, int shakeItUpFlag)
-{
-	int myId, yourId;
-	int nBodies;
-	float4 forceVector, forceVectorSum;
-	float4 posMe, posYou;
-	
-	nBodies = nPolymer + nPlastics;
-	myId = threadIdx.x + blockDim.x*blockIdx.x;
-    	if(myId < nBodies)
-    	{
-		posMe.x = pos[myId].x;
-		posMe.y = pos[myId].y;
-		posMe.z = pos[myId].z;
-		posMe.w = pos[myId].w;
-		
-		forceVectorSum.x = 0.0;
-		forceVectorSum.y = 0.0;
-		forceVectorSum.z = 0.0;
-		
-		for(yourId = 0; yourId < nBodies; yourId++)
-		{
-			posYou.x = pos[yourId].x;
-			posYou.y = pos[yourId].y;
-			posYou.z = pos[yourId].z;
-			posYou.w = pos[yourId].w;
-			
-			if(yourId != myId) // Making sure you are not working on youself.
-			{
-				if(myId < nPolymer && yourId < nPolymer)
-				{
-					// Polymer-polymer force
-					forceVector = getPolymerPolymerForce(posMe, posYou, linkA[myId], linkB[myId], yourId, length, myId);
-				}
-				
-			    	forceVectorSum.x += forceVector.x;
-			    	forceVectorSum.y += forceVector.y;
-			    	forceVectorSum.z += forceVector.z;
-		    	}
-		}
-		
-		// This adds on the forces to keep the bodies in the container.
-		forceVector = getContainerForces(posMe, beakerRadius, fluidHeight);
-		forceVectorSum.x += forceVector.x;
-		forceVectorSum.y += forceVector.y;
-		forceVectorSum.z += forceVector.z;
-		
-		// This is adds Brownian Motion to the system.
-		forceVector = brownian_motion(states, myId);
-		forceVectorSum.x += forceVector.x;
-		forceVectorSum.y += forceVector.y;
-		forceVectorSum.z += forceVector.z;
-		
-		// Tranfering all the forces to my force function
-		force[myId].x += forceVectorSum.x;
-		force[myId].y += forceVectorSum.y;
-		force[myId].z += forceVectorSum.z;
-    	}
-}
-
-
+/******************************************************************************
+ This function moves the bodies.
+*******************************************************************************/
 __global__ void moveBodies(float4 *pos, float4 *vel, float4 *force, float drag, float dt, int n)
 {
 	int id = threadIdx.x + blockDim.x*blockIdx.x;
@@ -1356,98 +952,130 @@ void nBody()
 	}
 }
 
-void errorCheck(const char *message)
-{
-	cudaError_t  error;
-	error = cudaGetLastError();
-
-	if(error != cudaSuccess)
-	{
-		printf("\n CUDA ERROR: %s = %s\n", message, cudaGetErrorString(error));
-		exit(0);
-	}
-}
-
 void terminalPrint()
 {
-	if(DebugFlag != 1)
+	system("clear");
+	//printf("\033[0;34m"); // blue.
+	//printf("\033[0;36m"); // cyan
+	//printf("\033[0;33m"); // yellow
+	//printf("\033[0;31m"); // red
+	//printf("\033[0;32m"); // green
+	printf("\033[0m"); // back to white.
+	
+	printf("\n");
+	printf("\033[0;33m");
+	printf("\n **************************** Simulation Stats ****************************");
+	printf("\033[0m");
+	
+	printf("\n Total run time = %7.2f milliseconds", RunTime);
+	
+	printf("\033[0;33m");
+	printf("\n **************************** Terminal Comands ****************************");
+	printf("\033[0m");
+	//printf("\n h: Help");
+	//printf("\n c: Recenter View");
+	printf("\n q/Q: Screenshot/Movie");
+	//printf("\n k: Save Current Run");
+	printf("\n");
+	
+	printf("\n Toggles");
+	printf("\n r: Run/Pause            - ");
+	if(Pause == 0) 
 	{
-		system("clear");
-		//printf("\033[0;34m"); // blue.
-		//printf("\033[0;36m"); // cyan
-		//printf("\033[0;33m"); // yellow
-		//printf("\033[0;31m"); // red
-		//printf("\033[0;32m"); // green
-		printf("\033[0m"); // back to white.
+		printf("\033[0;32m");
+		printf(BOLD_ON "Simulation Running" BOLD_OFF);
+	} 
+	else
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Simulation Paused" BOLD_OFF);
+	}
+	printf("\n v: Orthogonal/Frustum   - ");
+	if (ViewFlag == 0) 
+	{
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Orthogonal" BOLD_OFF); 
+	}
+	else 
+	{
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Frustrum" BOLD_OFF);
+	}
+	printf("\n m: Video On/Off         - ");
+	if (MovieFlag == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Video Recording Off" BOLD_OFF); 
+	}
+	else 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Video Recording On" BOLD_OFF);
+	}
+	printf("\n e: Viewing Aids         - ");
+	if(RadialConfinementViewingAids == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Viewing Aids Off" BOLD_OFF);
+	}
+	else 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Viewing Aids On" BOLD_OFF);
+	}
+	printf("\n x: Stirring On/Off      - ");
+	if(StirFlag == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Stirring Off" BOLD_OFF);
+	}
+	else 
+	{
+		printf("\033[0;32m");
 		
-		printf("\n");
-		printf("\033[0;33m");
-		printf("\n **************************** Simulation Stats ****************************");
-		printf("\033[0m");
-		
-		printf("\n Total run time = %7.2f milliseconds", RunTime);
-		
-		printf("\033[0;33m");
-		printf("\n **************************** Terminal Comands ****************************");
-		printf("\033[0m");
-		//printf("\n h: Help");
-		//printf("\n c: Recenter View");
-		printf("\n c: Screenshot");
-		//printf("\n k: Save Current Run");
-		printf("\n");
-		
-		printf("\n Toggles");
-		printf("\n r: Run/Pause            - ");
-		if(Pause == 0) 
-		{
-			printf("\033[0;32m");
-			printf(BOLD_ON "Simulation Running" BOLD_OFF);
-		} 
-		else
-		{
-			printf("\033[0;31m");
-			printf(BOLD_ON "Simulation Paused" BOLD_OFF);
-		}
-		printf("\n v: Orthogonal/Frustum   - ");
-		if (ViewFlag == 0) 
-		{
-			printf("\033[0;36m"); // cyan
-			printf(BOLD_ON "Orthogonal" BOLD_OFF); 
-		}
-		else 
-		{
-			printf("\033[0;36m"); // cyan
-			printf(BOLD_ON "Frustrum" BOLD_OFF);
-		}
-		printf("\n m: Video On/Off         - ");
-		if (MovieFlag == 0) 
-		{
-			printf("\033[0;31m");
-			printf(BOLD_ON "Video Recording Off" BOLD_OFF); 
-		}
-		else 
-		{
-			printf("\033[0;32m");
-			printf(BOLD_ON "Video Recording On" BOLD_OFF);
-		}
-		printf("\n e: Radial Confinement Viewing Aid   - ");
-		if(RadialConfinementViewingAids == 0) 
-		{
-			printf("\033[0;31m");
-			printf(BOLD_ON "Radial Confinement Viewing Aid Off" BOLD_OFF);
-		}
-		else 
-		{
-			printf("\033[0;32m");
-			printf(BOLD_ON "Radial Confinement Viewing Aid On" BOLD_OFF);
-		}
-		
+		printf(BOLD_ON "Stirring..." BOLD_OFF);
+	}
+	printf("\n c: Shake It Up On/Off   - ");
+	if(ShakeItUpFlag == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Shake Off" BOLD_OFF);
+	}
+	else 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Shake On" BOLD_OFF);
+	}
+	printf("\n t: Top/Side view        - ");
+	if(TopView == 0) //side view
+	{
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Side View" BOLD_OFF);
+
 		printf("\n");
 		printf("\n Adjust views");
 		printf("\n k/l: Rotate CW/CCW");
 		printf("\n a/d: Translate Left/Right");
 		printf("\n s/w: Translate Down/Up");
 		printf("\n z/Z: Translate Out/In");
+		printf("\n f:   Recenter");
+		printf("\n");
+		printf("\n ********************************************************************");
+		printf("\033[0m");
+		printf("\n");
+
+	}
+	else //top view controls
+	{
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Top View" BOLD_OFF);
+
+		printf("\n");
+		printf("\n Adjust views");
+		printf("\n k/l: Rotate CW/CCW");
+		printf("\n a/d: Translate Left/Right");
+		printf("\n z/Z: Translate Down/Up");
+		printf("\n w/s: Translate Out/In");
 		printf("\n f:   Recenter");
 		printf("\n");
 		printf("\n ********************************************************************");
@@ -1480,11 +1108,12 @@ void setup()
 	DrawTimer = 0;
 	PrintTimer = 0;
 	RunTime = 0.0;
-	Pause = 0;
+	Pause = 1;
 	MovieFlag = 0;
 	ViewFlag = 1;
+	TopView = 1;
 	RadialConfinementViewingAids = 1;
-	StirFlag = 1;
+	StirFlag = 0;
 	ShakeItUpFlag = 0;
 	DebugFlag = 0;
 	Theta = 0.0;
@@ -1503,8 +1132,6 @@ void setup()
 	terminalPrint();
 }
 
-	
-
 int main(int argc, char** argv)
 {
 	setup();
@@ -1515,12 +1142,12 @@ int main(int argc, char** argv)
 
 	// Clip plains
 	Near = 0.2;
-	Far = BeakerRadius*6.0;
+	Far = FluidHeight*2.0;
 
 	//Direction here your eye is located location
 	EyeX = 0.0;
-	EyeY = FluidHeight+ 100;
-	EyeZ = 1.0;
+	EyeY = FluidHeight+FluidHeight/3.0;
+	EyeZ = 1.0; //BeakerRadius+BeakerRadius/10.0;
 
 	//Where you are looking
 	CenterX = 0.0;

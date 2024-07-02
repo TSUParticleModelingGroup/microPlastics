@@ -6,7 +6,7 @@ Time Unit is millisecond or 10E-3 seconds (ms)
 
 ******************** MICROPLASTIC INFO **************************************
 This should be the number of microplastics you want to be randomly distributed in the solution.
-NumberOfMicroPlastics = 20;
+NumberOfMicroPlastics = 10;
 
 The next two should be the density range for the microplastics. The typical values are given in grams/cm^3.
 We need this in mg/mm^3. To do this you need to multiply by 10^-6.
@@ -14,19 +14,19 @@ DensityOfMicroPlasticMin = 0.85e-6;
 
 DensityOfMicroPlasticMax = 2.3e-6;
 
-The next two should be the diameter range for the microplastics in micro meters.
+The next two should be the diameter range for the microplastics in micro meters. (Typical 100 - 5000)
 DiameterOfMicroPlasticMin = 100.0;
 
-DiameterOfMicroPlasticMax = 5000.0; 
-******************** Polymer INFO **************************************
+DiameterOfMicroPlasticMax = 200.0; 
 
+******************** Polymer INFO **************************************
 This should be the number of polyimer chain that you want to work with.
-NumberOfPolymerChains = 20;
+NumberOfPolymerChains = 10;
 
 The next two should be the range for the chain lengths of the polymers.
-PolymersChainLengthMin = 5;
+PolymersChainLengthMin = 2;
 
-PolymersChainLengthMax = 20;
+PolymersChainLengthMax = 100;
 
 This is the distance between polymers in a chain. It should be in micrometers.
 PolymersConnectionLength = 0.0001415;
@@ -35,25 +35,25 @@ This should be the density for the polymer. The typical values are given in gram
 We need this in mg/mm^3. To do this you need to multiply by 10^-6.
 DensityOfPolymer = 1.0e-6;
 
-This should be the diameter of the polymer in micrometers.
-DiameterOfPolymer = 45;
+This should be the diameter of the polymer in micrometers. (Tyipical 45)
+DiameterOfPolymer = 45.0;
 
 ******************** Confinement INFO **************************************
 
 This is the radius of the beaker in micrometers.
 Standard Beaker Radius is 4900 micrometers 20 
-87mm outside diamter, standard looks to be 5mm thick, so 38.5 mm?
-BeakerRadius = 38500.0;
+87mm outside diamter, standard looks to be 5mm thick, so 38.5 mm? (Tyipical 38500.0)
+BeakerRadius = 3500.0;
 
 This is the height of the fliud in the beaker in micrometers.
-Fluid height for this case is 118000 micrometers 100
-FluidHeight = 91440.0;
+Fluid height for this case is 118000 micrometers 100 (Tyipical 91440.0)
+FluidHeight = 9440.0;
 
 ******************** Fluid INFO **************************************
 
 FluidDensity = 1.0e-6
 
-Drag = 1.1;
+Drag = 0.5;
 
 ******************** Timing INFO **************************************
 

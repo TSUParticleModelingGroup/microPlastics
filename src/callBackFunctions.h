@@ -33,6 +33,26 @@ void fulstrumView()
 	drawPicture();
 }
 
+void topView()
+{
+	glLoadIdentity();
+	glTranslatef(0.0, -CenterY, 0.0);
+	glTranslatef(0.0, 0.0, -BeakerRadius);
+	glTranslatef(CenterOfSimulation.x, CenterOfSimulation.y, CenterOfSimulation.z);
+	glRotatef(90.0, 1.0, 0.0, 0.0);
+	glTranslatef(-CenterOfSimulation.x, -CenterOfSimulation.y, -CenterOfSimulation.z);
+	glTranslatef(0.0, -FluidHeight+ FluidHeight/10.0, 0.0);
+	drawPicture();
+}
+
+void sideView()
+{
+	glLoadIdentity();
+	glTranslatef(0.0, -CenterY, 0.0);
+	glTranslatef(0.0, -FluidHeight/10.0, -BeakerRadius-BeakerRadius/10.0);
+	drawPicture();
+}
+
 string getTimeStamp()
 {
 	// Want to get a time stamp string representing current date/time, so we have a
@@ -122,8 +142,9 @@ void KeyPressed(unsigned char key, int x, int y)
 	float dy = 100;
 	float dz = 100;
 	float temp;
+	
 
-	if(key == 'q')
+	if(key == 'Q')
 	{
 		if(MovieFlag == 1) 
 		{
@@ -178,7 +199,7 @@ void KeyPressed(unsigned char key, int x, int y)
 			terminalPrint();
 		}	
 	}
-	if(key == 'c')
+	if(key == 'q')
 	{
 		screenShot();
 	}
@@ -232,46 +253,45 @@ void KeyPressed(unsigned char key, int x, int y)
 	if(key == 'a')  // Translate left on the x-axis
 	{
 		glTranslatef(dx, 0.0, 0.0);
-			//CenterOfSimulation.x += dx;
+			DistanceFromCenter.x += dx;
 			drawPicture();
 	}
 	if(key == 'd')  // Translate right on the x-axis
 	{
 		glTranslatef(-dx, 0.0, 0.0);
-			//CenterOfSimulation.x += -dx;
+			DistanceFromCenter.x += -dx;
 			drawPicture();
 	}
 	if(key == 's')  // Translate down on the y-axis
 	{
 			glTranslatef(0.0, dy, 0.0);
-			//CenterOfSimulation.y += dy;
+			DistanceFromCenter.y += dy;
 			drawPicture();
 	}
 	if(key == 'w')  // Translate up on the y-axis
 	{
 		glTranslatef(0.0, -dy, 0.0);
-			//CenterOfSimulation.y += -dy;
+			DistanceFromCenter.y += -dy;
 			drawPicture();
 	}
 	if(key == 'z')  // Translate out on the z-axis
 	{
 		glTranslatef(0.0, 0.0, -dz);
-			//CenterOfSimulation.z += -dz;
+			DistanceFromCenter.z += -dz;
 			drawPicture();
 	}
 	if(key == 'Z')  // Translate in on the z-axis
 	{
 		glTranslatef(0.0, 0.0, dz);
-			//CenterOfSimulation.z += dz;
+			DistanceFromCenter.z += dz;
 			drawPicture();
 	}
 	if(key == 'f')  // Recenter
 	{
-		glTranslatef(-CenterOfSimulation.x, -CenterOfSimulation.y, -CenterOfSimulation.z);
-			CenterOfSimulation.x = 0.0;
-			CenterOfSimulation.y = 0.0;
-			CenterOfSimulation.z = 0.0;
-			CenterOfSimulation.w = 0.0;
+		glTranslatef(-DistanceFromCenter.x, -DistanceFromCenter.y, -DistanceFromCenter.z);
+			DistanceFromCenter.x = 0.0;
+			DistanceFromCenter.y = 0.0;
+			DistanceFromCenter.z = 0.0;
 			drawPicture();
 	}
 	if(key == 'e')//toggle rings
@@ -285,6 +305,63 @@ void KeyPressed(unsigned char key, int x, int y)
 		else
 		{
 			RadialConfinementViewingAids = 0;
+			terminalPrint();
+			drawPicture();
+		}
+
+	}
+	if(key == 't')
+	{
+		if(TopView == 0) //looking at the side currently, change to top
+		{
+			TopView = 1;
+			topView();
+			terminalPrint();
+			drawPicture();
+
+		}
+		else
+		{
+			TopView = 0;
+			sideView();
+			terminalPrint();
+			drawPicture();
+		}
+	}
+	if(key =='x')//stir
+	{
+		if(StirFlag == 0)
+		{
+			printf("How fast would you like to Stir?\n");
+			printf("Enter in Rev/s and we will convert it to milliseconds.\n");
+			scanf("%f", &StirAngularVelosity);
+			StirAngularVelosity = ((2.0*PI)/1000.0)*StirAngularVelosity;
+			StirFlag = 1;
+			terminalPrint();
+			drawPicture();
+		}
+		else
+		{
+			StirFlag = 0;
+			terminalPrint();
+			drawPicture();
+		}
+
+
+	}
+	if(key == 'c')//shake
+	{
+		if(ShakeItUpFlag == 0)
+		{
+			ShakeItUpFlag = 1;
+			printf("Enter the magnitude of the shake\n");
+			scanf("%f", &ShakeItUpMag);
+			terminalPrint();
+			drawPicture();
+		}
+		else
+		{
+			ShakeItUpFlag = 0;
 			terminalPrint();
 			drawPicture();
 		}
