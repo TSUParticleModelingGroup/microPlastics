@@ -80,7 +80,7 @@ float RunTime;
 float4 CenterOfSimulation;
 float4 DistanceFromCenter = make_float4(0.0, 0.0, 0.0, 0.0);
 float4 AngleOfSimulation;
-__device__ float ShakeItUpMag;
+float ShakeItUpMag;
 
 int DebugFlag;
 int RadialConfinementViewingAids;
@@ -119,7 +119,7 @@ void terminalPrint();
 void setup();
 
 __global__ void init_curand(unsigned int, curandState_t*);
-__global__ void getForces(curandState_t*, float4 *, float4 *, float4 *, int *, int *, float, int, int, float, float, float, int, float, int );
+__global__ void getForces(curandState_t*, float4 *, float4 *, float4 *, int *, int *, float, int, int, float, float, float, int, float, int, float );
 __global__ void getForcesSetup(curandState_t* , float4 *, float4 *, float4 *, int *, int *, float, int, int, float, float, float, int, float, int );
 __global__ void moveBodies(float4 *pos, float4 *, float4 *, float, float, int);
 
@@ -779,7 +779,7 @@ __global__ void init_curand(unsigned int seed, curandState_t* states)
 /******************************************************************************
  This function controlls all the forces that act on the bodies.
 *******************************************************************************/
-__global__ void getForces(curandState_t* states, float4 *pos, float4 *vel, float4 *force, int *linkA, int *linkB, float length, int nPolymer, int nPlastics, float beakerRadius, float fluidHeight, float fluidDensity, int stirFlag, float theta, int shakeItUpFlag)
+__global__ void getForces(curandState_t* states, float4 *pos, float4 *vel, float4 *force, int *linkA, int *linkB, float length, int nPolymer, int nPlastics, float beakerRadius, float fluidHeight, float fluidDensity, int stirFlag, float theta, int shakeItUpFlag, float ShakeItUpMag)
 {
 	int myId, yourId;
 	int nBodies;
@@ -883,7 +883,7 @@ __global__ void getForces(curandState_t* states, float4 *pos, float4 *vel, float
 		// This just adds random motion to the system.
 		if(shakeItUpFlag == 1)
 		{
-			velocityVector = shakeItUp(states, myId);
+			velocityVector = shakeItUp(states, myId, ShakeItUpMag);
 			vel[myId].x += velocityVector.x;
 			vel[myId].y += velocityVector.y;
 			vel[myId].z += velocityVector.z;
@@ -918,7 +918,7 @@ void nBody()
 {
 	if(Pause != 1)
 	{	
-		getForces<<<Grids, Blocks>>>(DevStates, BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, PolymerConnectionAGPU, PolymerConnectionBGPU, PolymersConnectionLength, NumberOfPolymers, NumberOfMicroPlastics, BeakerRadius, FluidHeight, FluidDensity, StirFlag, Theta, ShakeItUpFlag);
+		getForces<<<Grids, Blocks>>>(DevStates, BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, PolymerConnectionAGPU, PolymerConnectionBGPU, PolymersConnectionLength, NumberOfPolymers, NumberOfMicroPlastics, BeakerRadius, FluidHeight, FluidDensity, StirFlag, Theta, ShakeItUpFlag, ShakeItUpMag);
 		errorCheck("getForces");
 		moveBodies<<<Grids, Blocks>>>(BodyPositionGPU, BodyVelocityGPU, BodyForceGPU, Drag, Dt, NumberOfBodies);
 		errorCheck("moveBodies");

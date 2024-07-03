@@ -1,5 +1,5 @@
 __device__ float4 brownian_motion(curandState_t*, int);
-__device__ float4 shakeItUp(curandState_t*, int);
+__device__ float4 shakeItUp(curandState_t*, int, float);
 __device__ float4 getPolymerPolymerForce(float4, float4, int, int, int, float, int);
 __device__ float4 getPolymerMicroPlasticForce(float4, float4);
 __device__ float4 getMicroPlasticMicroPlasticForce(float4, float4);
@@ -30,9 +30,9 @@ __device__ float4 brownian_motion(curandState_t* states, int id)
 /******************************************************************************
  This function just shakes the whole system up
 *******************************************************************************/
-__device__ float4 shakeItUp(curandState_t* states, int id)
+__device__ float4 shakeItUp(curandState_t* states, int id, float shakeItUpMag)
 {
-	float mag = 10.0;
+	float mag = shakeItUpMag;
 	float4 v;
 	float randx = mag*(curand_uniform(&states[id])*2.0 - 1.0);
         float randy = mag*(curand_uniform(&states[id])*2.0 - 1.0);

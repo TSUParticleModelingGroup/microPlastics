@@ -144,17 +144,6 @@ void KeyPressed(unsigned char key, int x, int y)
 	float temp;
 	
 
-	if(key == 'Q')
-	{
-		if(MovieFlag == 1) 
-		{
-			movieOff();
-		}
-		glutDestroyWindow(Window);
-		printf("\n Good Bye \n");
-		exit(0);
-	}
-	
 	if(key == 'v') // Orthoganal/Fulstrium view
 	{
 		if(ViewFlag == 0) 
@@ -184,7 +173,7 @@ void KeyPressed(unsigned char key, int x, int y)
 			terminalPrint();
 		}
 	}
-	if(key == 'm')
+	if(key == 'M')
 	{
 		if(MovieFlag == 0) 
 		{
@@ -199,7 +188,7 @@ void KeyPressed(unsigned char key, int x, int y)
 			terminalPrint();
 		}	
 	}
-	if(key == 'q')
+	if(key == 'm')
 	{
 		screenShot();
 	}
