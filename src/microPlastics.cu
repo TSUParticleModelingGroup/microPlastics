@@ -974,7 +974,8 @@ void terminalPrint()
 	printf("\033[0m");
 	//printf("\n h: Help");
 	//printf("\n c: Recenter View");
-	printf("\n q/Q: Screenshot/Movie");
+	printf("\n m/M: Screenshot/Movie");
+	printf("\n q: quit");
 	//printf("\n k: Save Current Run");
 	printf("\n");
 	
