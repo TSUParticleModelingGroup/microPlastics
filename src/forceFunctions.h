@@ -104,7 +104,7 @@ __device__ float4 getPolymerMicroPlasticForce(float4 p0, float4 p1)
     float dx = p1.x - p0.x;
     float dy = p1.y - p0.y;
     float dz = p1.z - p0.z;
-    float r2 = dx*dx + dy*dy + dz*dz + 0.000001;
+    float r2 = dx*dx + dy*dy + dz*dz + 0.0001;
     float r = sqrt(r2);
     float G = 100.0;
     float penitration = (p0.w + p1.w)/2.0 - r;
@@ -144,7 +144,7 @@ __device__ float4 getMicroPlasticMicroPlasticForce(float4 p0, float4 p1)
     float dx = p1.x - p0.x;
     float dy = p1.y - p0.y;
     float dz = p1.z - p0.z;
-    float r2 = dx*dx + dy*dy + dz*dz + 0.000001;
+    float r2 = dx*dx + dy*dy + dz*dz + 0.0001;
     float r = sqrt(r2);
     float penitration = (p0.w + p1.w)/2.0 - r;
     float k = 100.0;

@@ -3,7 +3,7 @@
 chmod u+rwx ../src
 chmod 755 callBackFunctions.h
 chmod 755 microPlastics.cu
-chmod 755 compile.sh
-chmod 755 run.sh
+chmod 755 compile
+chmod 755 run
 chmod 775 Stills
 chmod u+rw simulationSetup

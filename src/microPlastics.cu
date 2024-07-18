@@ -974,7 +974,8 @@ void terminalPrint()
 	printf("\033[0m");
 	//printf("\n h: Help");
 	//printf("\n c: Recenter View");
-	printf("\n q/Q: Screenshot/Movie");
+	printf("\n q: Quit");
+	printf("\n m/M: Screenshot/Movie");
 	//printf("\n k: Save Current Run");
 	printf("\n");
 	
@@ -1001,16 +1002,16 @@ void terminalPrint()
 		printf("\033[0;36m"); // cyan
 		printf(BOLD_ON "Frustrum" BOLD_OFF);
 	}
-	printf("\n m: Video On/Off         - ");
-	if (MovieFlag == 0) 
+	printf("\n t: Top/Side view        - ");
+	if(TopView == 0) 
 	{
-		printf("\033[0;31m");
-		printf(BOLD_ON "Video Recording Off" BOLD_OFF); 
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Side View" BOLD_OFF);
 	}
 	else 
 	{
-		printf("\033[0;32m");
-		printf(BOLD_ON "Video Recording On" BOLD_OFF);
+		printf("\033[0;36m"); // cyan
+		printf(BOLD_ON "Top View" BOLD_OFF);
 	}
 	printf("\n e: Viewing Aids         - ");
 	if(RadialConfinementViewingAids == 0) 
@@ -1022,6 +1023,17 @@ void terminalPrint()
 	{
 		printf("\033[0;32m");
 		printf(BOLD_ON "Viewing Aids On" BOLD_OFF);
+	}
+	printf("\n m: Video On/Off         - ");
+	if (MovieFlag == 0) 
+	{
+		printf("\033[0;31m");
+		printf(BOLD_ON "Video Recording Off" BOLD_OFF); 
+	}
+	else 
+	{
+		printf("\033[0;32m");
+		printf(BOLD_ON "Video Recording On" BOLD_OFF);
 	}
 	printf("\n x: Stirring On/Off      - ");
 	if(StirFlag == 0) 
@@ -1046,12 +1058,9 @@ void terminalPrint()
 		printf("\033[0;32m");
 		printf(BOLD_ON "Shake On" BOLD_OFF);
 	}
-	printf("\n t: Top/Side view        - ");
+	
 	if(TopView == 0) //side view
 	{
-		printf("\033[0;36m"); // cyan
-		printf(BOLD_ON "Side View" BOLD_OFF);
-
 		printf("\n");
 		printf("\n Adjust views");
 		printf("\n k/l: Rotate CW/CCW");
@@ -1067,9 +1076,6 @@ void terminalPrint()
 	}
 	else //top view controls
 	{
-		printf("\033[0;36m"); // cyan
-		printf(BOLD_ON "Top View" BOLD_OFF);
-
 		printf("\n");
 		printf("\n Adjust views");
 		printf("\n k/l: Rotate CW/CCW");

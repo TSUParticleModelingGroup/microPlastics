@@ -144,6 +144,11 @@ void KeyPressed(unsigned char key, int x, int y)
 	float temp;
 	
 
+	if (key == 'q') //quit
+	{
+		exit(0);
+	}
+
 	if(key == 'v') // Orthoganal/Fulstrium view
 	{
 		if(ViewFlag == 0) 
