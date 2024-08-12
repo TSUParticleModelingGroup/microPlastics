@@ -35,7 +35,7 @@ __device__ float4 shakeItUp(curandState_t* states, int id, float shakeItUpMag)
 	float mag = shakeItUpMag;
 	float4 v;
 	float randx = mag*(curand_uniform(&states[id])*2.0 - 1.0);
-        float randy = mag*(curand_uniform(&states[id])*2.0 - 1.0);
+    	float randy = mag*(curand_uniform(&states[id])*2.0 - 1.0);
         float randz = mag*(curand_uniform(&states[id])*2.0 - 1.0);
         
         v.x = randx;
@@ -106,7 +106,7 @@ __device__ float4 getPolymerMicroPlasticForce(float4 p0, float4 p1)
     float dz = p1.z - p0.z;
     float r2 = dx*dx + dy*dy + dz*dz + 0.0001;
     float r = sqrt(r2);
-    float G = 100.0;
+    float G = 15000.0; //before was 100.0
     float penitration = (p0.w + p1.w)/2.0 - r;
     float k = 100.0;
     
@@ -232,7 +232,7 @@ __device__ float4 getStirringForces(curandState_t* states, int id, float4 posMe,
 	float magRand = 10000.0;
 	float centerMag;
 	//float temp;
-	float magStir = 200.0; 
+	float magStir = 100000.0; //before was 200
 	//float mag2 = 10.0;
 	float r2 = posMe.x*posMe.x + posMe.z*posMe.z;
 	float r = sqrt(r2);

@@ -374,7 +374,7 @@ void polymerShakeUp(float4 *pos, float4 *vel, float4 *force, int *linkA, int *li
 	float magx, magy, magz, mag;
 	float dragTemp = drag;
 	
-	mag = 10.0;
+	mag = 100000.0;//before was 10
 	float stopTime = 2.0;
 	float time = 0;
 	DrawTimer = 0;
@@ -396,7 +396,7 @@ void polymerShakeUp(float4 *pos, float4 *vel, float4 *force, int *linkA, int *li
 		
 		for(int i = 0; i < n; i++)
 		{
-			mag = 10.0;
+			mag = 1000000.0; //before was 10
 			if(time < 1.0)
 			{
 				dragTemp = 0.001;
