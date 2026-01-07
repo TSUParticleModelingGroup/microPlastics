@@ -1,0 +1,3 @@
+nvcc src/microPlastics.cu -o microPlastics -lglut -lm -lGLU -lGL
+
+./microPlastics
